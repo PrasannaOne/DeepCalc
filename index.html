@@ -1,0 +1,1119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#faf9ff">
+<meta name="color-scheme" content="light dark">
+<title>SoulCalc</title>
+<style>
+/* SoulCalc web port. Layout and interaction are based on the repository's
+   Android MainScreen, LineRow and CalculatorKeyboard components. */
+:root{
+  color-scheme:light;
+  --surface:#faf9ff;--on-surface:#1b1b21;--on-surface-variant:#62636d;
+  --surface-variant:#e6e6ef;--input-bg:#f0eff5;--primary-container:#dfe4fb;
+  --primary:#4d639b;--secondary-container:#dfe4fb;--on-secondary-container:#24365f;
+  --error-container:#ffdad6;--on-error-container:#410002;--outline:#777782;
+  --menu-shadow:0 8px 26px #17172a26;
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --surface:#111318;--on-surface:#e3e2e9;--on-surface-variant:#c4c5cf;
+  --surface-variant:#383e4d;--input-bg:#24252a;--primary-container:#1b263c;
+  --primary:#b2c6ff;--secondary-container:#3e465a;--on-secondary-container:#dce2f8;
+  --error-container:#8f1712;--on-error-container:#ffdad6;--outline:#92939d;
+  --menu-shadow:0 8px 28px #0008;
+}
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--surface);color:var(--on-surface);font-family:Roboto,"Segoe UI",Arial,sans-serif}
+button,input{font:inherit}
+button{color:inherit}
+.app{height:100dvh;min-height:0;width:100%;display:flex;flex-direction:column;background:var(--surface);padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+.topbar{height:64px;min-height:64px;display:flex;align-items:center;padding:0 4px 0 16px;background:var(--surface);position:relative;z-index:3}
+.app-title{font-size:22px;line-height:28px;font-weight:400;letter-spacing:0}
+.top-actions{margin-left:auto;display:flex;align-items:center;height:100%;gap:0}
+.icon-button{width:48px;height:48px;border:0;background:transparent;color:var(--on-surface-variant);display:grid;place-items:center;border-radius:50%;padding:0}
+.icon-button:active{background:var(--surface-variant)}
+.icon-button svg{width:24px;height:24px;display:block;fill:currentColor}
+.dropdown{position:absolute;right:6px;top:54px;min-width:196px;padding:6px 0;background:var(--surface);border-radius:5px;box-shadow:var(--menu-shadow);border:1px solid color-mix(in srgb,var(--outline) 18%,transparent);display:none;z-index:10}
+.dropdown.open{display:block}
+.menu-item{height:48px;display:flex;align-items:center;gap:14px;padding:0 16px;border:0;width:100%;background:transparent;text-align:left;font-size:14px;color:var(--on-surface)}
+.menu-item:active{background:var(--surface-variant)}
+.menu-item svg{width:20px;height:20px;fill:var(--on-surface-variant)}
+.menu-divider{height:1px;background:var(--surface-variant);margin:5px 0}
+.content{flex:1;min-height:0;display:flex;flex-direction:column;background:var(--surface)}
+.lines{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:0 0 4px;scrollbar-width:thin;scrollbar-color:var(--surface-variant) transparent}
+.line-row{display:flex;align-items:stretch;width:100%;min-height:0;padding:4px 8px;gap:0}
+.line-number{flex:0 0 16px;padding:4px 8px 0 0;text-align:left;color:var(--on-surface-variant);opacity:.62;font-size:12px;line-height:20px;font-weight:400}
+.input-box{flex:7 1 0;min-width:0;min-height:32px;padding:4px 8px;background:var(--input-bg);border-radius:4px;display:flex;align-items:flex-start}
+.expression{display:block;width:100%;min-width:0;min-height:24px;padding:0;margin:0;border:0;outline:0;resize:none;overflow:hidden;background:transparent;color:var(--on-surface);font-family:Roboto,"Segoe UI",Arial,sans-serif;font-size:16px;font-weight:400;line-height:24px;letter-spacing:.5px;white-space:pre-wrap;overflow-wrap:anywhere;caret-color:var(--primary)}
+.expression.comment{color:var(--on-surface-variant)}
+.result-box{flex:3 1 0;min-width:0;min-height:32px;margin-left:8px;padding:4px 8px;background:color-mix(in srgb,var(--primary-container) 31%,var(--surface));border-radius:4px;display:flex;align-items:flex-start;justify-content:flex-end;overflow:hidden}
+.result{max-width:100%;min-height:24px;padding:0;margin:0;border:0;background:transparent;text-align:right;color:var(--primary);font-size:16px;font-weight:400;line-height:24px;letter-spacing:.25px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.result.error{color:var(--on-error-container)}
+.result.empty{color:var(--on-surface-variant)}
+.keyboard-panel{flex:none;background:var(--surface-variant);padding:4px;box-shadow:0 -1px 2px #00000010}
+.key-rows{display:flex;flex-direction:column;gap:4px}
+.key-row{display:flex;width:100%;gap:4px}
+.key{flex:1 1 0;min-width:0;height:56px;border:0;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:500;line-height:1;background:var(--secondary-container);color:var(--on-secondary-container);padding:0;touch-action:manipulation;user-select:none;-webkit-user-select:none}
+.key.digit{background:var(--surface);color:var(--on-surface)}
+.key.operator,.key.power,.key.special{background:var(--secondary-container);color:var(--on-secondary-container)}
+.key.danger,.key.enter{background:var(--error-container);color:var(--on-error-container)}
+.key.enter{height:116px;flex:1 1 0;font-size:22px}
+.key.alt{filter:brightness(1.06)}
+.bottom-key-rows{display:flex;width:100%;gap:4px}
+.bottom-left{flex:4;min-width:0;display:flex;flex-direction:column;gap:4px}
+.bottom-left .key-row .key{height:56px}
+.key:active{filter:brightness(.94)}
+.toast{position:fixed;left:50%;bottom:calc(316px + env(safe-area-inset-bottom,0px));transform:translate(-50%,12px);opacity:0;pointer-events:none;z-index:20;background:#303036;color:#fff;padding:10px 16px;border-radius:6px;font-size:14px;box-shadow:0 3px 10px #0004;transition:opacity .16s,transform .16s;white-space:nowrap}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+.dialog-scrim{position:fixed;inset:0;background:#0006;display:none;align-items:center;justify-content:center;padding:24px;z-index:30}
+.dialog-scrim.open{display:flex}
+.dialog{width:min(100%,420px);max-height:min(82dvh,650px);overflow:auto;padding:24px;background:var(--surface);border-radius:28px;box-shadow:0 12px 36px #0003;color:var(--on-surface)}
+.dialog-title{font-size:22px;line-height:28px;font-weight:400;margin:0 0 16px}
+.dialog-body{font-size:14px;line-height:20px;color:var(--on-surface)}
+.dialog-body p{margin:0 0 12px;white-space:pre-line}
+.dialog-body .section-title{font-size:14px;font-weight:700;margin:0 0 4px;color:var(--on-surface)}
+.dialog-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}
+.text-button{border:0;background:transparent;color:var(--primary);font-size:14px;font-weight:600;letter-spacing:.1px;padding:10px 12px;border-radius:8px}
+.variable-list{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.variable-chip{border:0;background:var(--secondary-container);color:var(--on-secondary-container);padding:7px 12px;border-radius:8px;font-size:14px}
+.theme-option{display:flex;align-items:center;gap:12px;min-height:48px;font-size:16px}
+.theme-option input{accent-color:var(--primary);width:20px;height:20px}
+.about-link{color:var(--primary);text-decoration:underline;overflow-wrap:anywhere}
+@media(max-height:640px){.key{height:46px}.key.enter{height:96px}.bottom-left .key-row .key{height:46px}.toast{bottom:calc(270px + env(safe-area-inset-bottom,0px))}}
+</style>
+</head>
+<body>
+<main class="app">
+  <header class="topbar">
+    <div class="app-title">SoulCalc</div>
+    <div class="top-actions">
+      <button class="icon-button" id="keyboardToggle" type="button" aria-label="Switch to system keyboard" title="Switch keyboard">
+        <svg id="keyboardIcon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 5H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zM8 8h2v2H8V8zm-3 0h2v2H5V8zm0 3h2v2H5v-2zm3 0h2v2H8v-2zm3-3h2v2h-2V8zm0 3h2v2h-2v-2zm3-3h2v2h-2V8zm0 3h2v2h-2v-2zm3-3h2v2h-2V8zm0 3h2v2h-2v-2zm-11 5v-1h10v1H6z"/></svg>
+      </button>
+      <button class="icon-button" id="menuToggle" type="button" aria-label="Menu" title="Menu">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm0 2a2 2 0 1 0 .001 4.001A2 2 0 0 0 12 10zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 12 16z"/></svg>
+      </button>
+    </div>
+    <div class="dropdown" id="menu">
+      <button class="menu-item" data-menu="copy"><svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>Copy All</button>
+      <button class="menu-item" data-menu="clear"><svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>Clear Sheet</button>
+      <div class="menu-divider"></div>
+      <button class="menu-item" data-menu="guide"><svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 .001 20.001A10 10 0 0 0 12 2zm1 17h-2v-2h2v2zm2.07-7.75-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26A2 2 0 1 0 10 9H8a4 4 0 1 1 8 0c0 .88-.36 1.68-.93 2.25z"/></svg>Guide</button>
+      <button class="menu-item" data-menu="settings"><svg viewBox="0 0 24 24"><path d="M19.14 12.94a7.9 7.9 0 0 0 .06-.94c0-.32-.02-.63-.07-.94l2.03-1.58-2-3.46-2.39.96a7.3 7.3 0 0 0-1.63-.95L14.78 3h-4l-.36 3.03c-.59.23-1.13.55-1.63.95l-2.39-.96-2 3.46 2.03 1.58a7.9 7.9 0 0 0 0 1.88L4.4 14.52l2 3.46 2.39-.96c.5.4 1.04.72 1.63.95L10.22 21h4l.36-3.03c.59-.23 1.13-.55 1.63-.95l2.39.96 2-3.46-2.06-1.58zM12 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z"/></svg>Settings</button>
+      <button class="menu-item" data-menu="about"><svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 .001 20.001A10 10 0 0 0 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>About</button>
+    </div>
+  </header>
+
+  <section class="content">
+    <div class="lines" id="lines" aria-label="Calculator lines"></div>
+    <section class="keyboard-panel" id="keyboardPanel" aria-label="Calculator keyboard">
+      <div class="key-rows">
+        <div class="key-row" id="keyTop">
+          <button class="key power" data-key="power">^</button>
+          <button class="key special" data-key="hash">#</button>
+          <button class="key special" data-key="dollar">$</button>
+          <button class="key operator" data-key="insert" data-value="=">=</button>
+          <button class="key danger" data-key="backspace">⌫</button>
+        </div>
+        <div class="key-row">
+          <button class="key digit" data-key="insert" data-value="7">7</button>
+          <button class="key digit" data-key="insert" data-value="8">8</button>
+          <button class="key digit" data-key="insert" data-value="9">9</button>
+          <button class="key operator" data-key="insert" data-value="÷">÷</button>
+          <button class="key operator" data-key="insert" data-value="(">(</button>
+        </div>
+        <div class="key-row">
+          <button class="key digit" data-key="insert" data-value="4">4</button>
+          <button class="key digit" data-key="insert" data-value="5">5</button>
+          <button class="key digit" data-key="insert" data-value="6">6</button>
+          <button class="key operator" data-key="insert" data-value="×">×</button>
+          <button class="key operator" data-key="insert" data-value=")">)</button>
+        </div>
+        <div class="bottom-key-rows">
+          <div class="bottom-left">
+            <div class="key-row">
+              <button class="key digit" data-key="insert" data-value="1">1</button>
+              <button class="key digit" data-key="insert" data-value="2">2</button>
+              <button class="key digit" data-key="insert" data-value="3">3</button>
+              <button class="key operator" data-key="insert" data-value="−">−</button>
+            </div>
+            <div class="key-row">
+              <button class="key operator" data-key="insert" data-value="%">%</button>
+              <button class="key digit" data-key="insert" data-value="0">0</button>
+              <button class="key digit" data-key="insert" data-value=".">.</button>
+              <button class="key operator" data-key="insert" data-value="+">+</button>
+            </div>
+          </div>
+          <button class="key enter" data-key="enter" aria-label="New line">↵</button>
+        </div>
+      </div>
+    </section>
+  </section>
+</main>
+
+<div class="toast" id="toast" role="status"></div>
+
+<div class="dialog-scrim" id="variableDialog" role="dialog" aria-modal="true" aria-labelledby="variableTitle">
+  <section class="dialog">
+    <h2 class="dialog-title" id="variableTitle">Insert Variable</h2>
+    <div class="dialog-body">
+      <p id="variableEmpty">No variables defined yet.
+Define a variable with: $name = value</p>
+      <div id="variablePickerContent" hidden>
+        <p>Tap to insert:</p>
+        <div class="variable-list" id="variableList"></div>
+      </div>
+    </div>
+    <div class="dialog-actions"><button class="text-button" data-close>Cancel</button></div>
+  </section>
+</div>
+
+<div class="dialog-scrim" id="guideDialog" role="dialog" aria-modal="true" aria-labelledby="guideTitle">
+  <section class="dialog">
+    <h2 class="dialog-title" id="guideTitle">Guide</h2>
+    <div class="dialog-body">
+      <div class="section-title">Basics</div>
+      <p>Type mathematical expressions and see results instantly. Use +, −, ×, ÷ for basic operations, ^ for power, and % for percentage.</p>
+      <div class="section-title">Variables</div>
+      <p>Define variables with $name = value
+Example: $tax = 0.08
+Use them in expressions: 100 × $tax</p>
+      <div class="section-title">Line References</div>
+      <p>Reference previous results with $1, $2, etc.
+Example: If line 1 equals 50, then $1 × 2 = 100</p>
+      <div class="section-title">Keyboard</div>
+      <p>^ — Power (hold for √ square root)
+$ — Variables (hold for picker)
+# — Start a comment
+⌫ — Backspace (hold to clear line)
+⏎ — New line</p>
+    </div>
+    <div class="dialog-actions"><button class="text-button" data-close>OK</button></div>
+  </section>
+</div>
+
+<div class="dialog-scrim" id="settingsDialog" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+  <section class="dialog">
+    <h2 class="dialog-title" id="settingsTitle">Settings</h2>
+    <div class="dialog-body">
+      <p style="margin-bottom:8px;color:var(--on-surface-variant)">Theme</p>
+      <label class="theme-option"><input type="radio" name="theme" value="system">System default</label>
+      <label class="theme-option"><input type="radio" name="theme" value="light">Light</label>
+      <label class="theme-option"><input type="radio" name="theme" value="dark">Dark</label>
+    </div>
+    <div class="dialog-actions"><button class="text-button" data-close>Done</button></div>
+  </section>
+</div>
+
+<div class="dialog-scrim" id="aboutDialog" role="dialog" aria-modal="true" aria-labelledby="aboutTitle">
+  <section class="dialog">
+    <h2 class="dialog-title" id="aboutTitle">SoulCalc</h2>
+    <div class="dialog-body">
+      <p>Version 1.2.3</p>
+      <p>Developed by Albert Zenkoff</p>
+      <p>Licensed under MIT License</p>
+      <p>Source code:<br><a class="about-link" href="https://github.com/tigrino/soulcalc" target="_blank" rel="noopener">https://github.com/tigrino/soulcalc</a></p>
+    </div>
+    <div class="dialog-actions"><button class="text-button" data-close>OK</button></div>
+  </section>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  // ---------------------------------------------------------------------------
+  // State and persistence (the web equivalent of SheetRepository/DataStore)
+  // ---------------------------------------------------------------------------
+  const SHEET_KEY = "soulcalc.web.sheet.v1";
+  const THEME_KEY = "soulcalc.web.theme.v1";
+  let inputs = [""];
+  let focusedLineIndex = 0;
+  let useCustomKeyboard = true;
+  let currentVariables = {};
+  let toastTimer = null;
+  let activeField = null;
+
+  const $ = id => document.getElementById(id);
+  const linesElement = $("lines");
+
+  function saveSheet() {
+    try {
+      localStorage.setItem(SHEET_KEY, JSON.stringify({
+        lines: inputs,
+        focusedLineIndex
+      }));
+    } catch (_) { /* Browser storage can be disabled; calculations still work. */ }
+  }
+
+  function loadSheet() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(SHEET_KEY) || "null");
+      if (saved && Array.isArray(saved.lines)) {
+        const savedLines = saved.lines.map(line => String(line));
+        inputs = savedLines.length ? savedLines : [""];
+        // Match MainViewModel.ensureTrailingBlankLine() and restoredFocusIndex().
+        if (inputs.length && inputs[inputs.length - 1].trim() !== "") inputs.push("");
+        const savedIndex = Number(saved.focusedLineIndex) || 0;
+        focusedLineIndex = savedIndex >= savedLines.length - 1
+          ? Math.max(inputs.length - 1, 0)
+          : Math.max(savedIndex, 0);
+        focusedLineIndex = Math.min(focusedLineIndex, inputs.length - 1);
+      }
+    } catch (_) {
+      inputs = [""];
+      focusedLineIndex = 0;
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Lexer, recursive-descent parser and evaluator ported from the repo's domain
+  // layer. Keep expression behaviour aligned with Lexer.kt / Parser.kt /
+  // Evaluator.kt / SheetEngine.kt rather than using JavaScript eval().
+  // ---------------------------------------------------------------------------
+  function significantDigits(literal) {
+    const digits = literal.replace(/\D/g, "");
+    const first = [...digits].findIndex(ch => ch !== "0");
+    if (first < 0) return 0;
+    let last = -1;
+    for (let i = digits.length - 1; i >= 0; i--) {
+      if (digits[i] !== "0") { last = i; break; }
+    }
+    return last - first + 1;
+  }
+
+  function tokenize(source) {
+    const tokens = [];
+    let position = 0;
+
+    while (position < source.length) {
+      const char = source[position];
+      if (/\s/.test(char)) { position++; continue; }
+      const start = position;
+
+      if (/[0-9]/.test(char) || (char === "." && /[0-9]/.test(source[position + 1] || ""))) {
+        let value = "";
+        let hasDecimal = false;
+        while (position < source.length) {
+          const current = source[position];
+          if (/[0-9]/.test(current)) {
+            value += current;
+            position++;
+          } else if (current === "." && !hasDecimal) {
+            hasDecimal = true;
+            value += current;
+            position++;
+          } else break;
+        }
+        tokens.push({ type: "NUMBER", value, position: start });
+        continue;
+      }
+
+      if (char === "$") {
+        position++;
+        const next = source[position];
+        if (next == null) throw new CalcError("Invalid token: $", start);
+        if (/[0-9]/.test(next)) {
+          let value = "";
+          while (/[0-9]/.test(source[position] || "")) value += source[position++];
+          tokens.push({ type: "LINE_REF", value, position: start });
+        } else if (/[A-Za-z]/.test(next)) {
+          let value = "";
+          while (/[A-Za-z0-9_]/.test(source[position] || "")) value += source[position++];
+          tokens.push({ type: "VARIABLE", value, position: start });
+        } else {
+          throw new CalcError("Invalid token: $", start);
+        }
+        continue;
+      }
+
+      const singles = {
+        "+":"PLUS", "-":"MINUS", "−":"MINUS", "*":"MULTIPLY", "×":"MULTIPLY",
+        "/":"DIVIDE", "÷":"DIVIDE", "%":"PERCENT", "^":"POWER", "=":"EQUALS",
+        "(":"LPAREN", ")":"RPAREN"
+      };
+      if (singles[char]) {
+        tokens.push({ type: singles[char], value: char, position: start });
+        position++;
+        continue;
+      }
+
+      if (/[A-Za-z]/.test(char)) {
+        let value = "";
+        while (/[A-Za-z0-9_]/.test(source[position] || "")) value += source[position++];
+        if (value.toLowerCase() === "sqrt") {
+          tokens.push({ type: "SQRT", value, position: start });
+        } else {
+          throw new CalcError("Invalid token: " + value, start);
+        }
+        continue;
+      }
+
+      throw new CalcError("Invalid token: " + char, start);
+    }
+
+    tokens.push({ type: "EOF", value: "", position: source.length });
+    return tokens;
+  }
+
+  class CalcError extends Error {
+    constructor(message, position = 0) {
+      super(message);
+      this.position = position;
+    }
+  }
+
+  function parseExpression(source) {
+    let tokens;
+    try {
+      tokens = tokenize(source);
+    } catch (error) {
+      return { kind: "error", message: error.message };
+    }
+
+    if (tokens.length === 1) return { kind: "empty" };
+    let pos = 0;
+    const current = () => tokens[pos];
+    const take = type => {
+      if (current().type !== type) {
+        throw new CalcError("Unexpected token: " + current().value, current().position);
+      }
+      return tokens[pos++];
+    };
+
+    function expression() {
+      if (current().type === "VARIABLE" && tokens[pos + 1]?.type === "EQUALS") {
+        const name = take("VARIABLE").value;
+        take("EQUALS");
+        return { type: "assignment", name, expression: computation() };
+      }
+      return computation();
+    }
+
+    function computation() {
+      let left = term();
+      while (current().type === "PLUS" || current().type === "MINUS") {
+        const operator = current().type;
+        pos++;
+        const right = term();
+        const adjustedRight = right.type === "percent" && right.base == null
+          ? { type: "percent", operand: right.operand, base: left }
+          : right;
+        left = {
+          type: "binary",
+          operator: operator === "PLUS" ? "ADD" : "SUBTRACT",
+          left,
+          right: adjustedRight
+        };
+      }
+      return left;
+    }
+
+    function term() {
+      let left = factor();
+      while (current().type === "MULTIPLY" || current().type === "DIVIDE") {
+        const operator = current().type === "MULTIPLY" ? "MULTIPLY" : "DIVIDE";
+        pos++;
+        left = { type: "binary", operator, left, right: factor() };
+      }
+      return left;
+    }
+
+    function factor() {
+      const base = power();
+      if (current().type === "PERCENT") {
+        pos++;
+        return { type: "percent", operand: base, base: null };
+      }
+      return base;
+    }
+
+    function power() {
+      const base = unary();
+      if (current().type === "POWER") {
+        pos++;
+        return { type: "binary", operator: "POWER", left: base, right: power() };
+      }
+      return base;
+    }
+
+    function unary() {
+      if (current().type === "MINUS") {
+        pos++;
+        return { type: "unaryMinus", operand: unary() };
+      }
+      return primary();
+    }
+
+    function primary() {
+      const token = current();
+      switch (token.type) {
+        case "NUMBER":
+          pos++;
+          if (significantDigits(token.value) > 15) {
+            throw new CalcError("Too many significant digits: " + token.value, token.position);
+          }
+          return { type: "number", value: Number(token.value) };
+        case "VARIABLE":
+          pos++;
+          return { type: "variable", name: token.value };
+        case "LINE_REF": {
+          pos++;
+          const lineNumber = Number(token.value);
+          if (!Number.isInteger(lineNumber) || lineNumber < 0 || lineNumber > 2147483647) {
+            throw new CalcError("Invalid line reference: $" + token.value, token.position);
+          }
+          return { type: "lineRef", lineNumber };
+        }
+        case "LPAREN": {
+          pos++;
+          const node = computation();
+          if (current().type !== "RPAREN") {
+            throw new CalcError("Expected ')'", current().position);
+          }
+          pos++;
+          return node;
+        }
+        case "SQRT": {
+          pos++;
+          if (current().type !== "LPAREN") {
+            throw new CalcError("Expected '(' after sqrt", current().position);
+          }
+          pos++;
+          const argument = computation();
+          if (current().type !== "RPAREN") {
+            throw new CalcError("Expected ')'", current().position);
+          }
+          pos++;
+          return { type: "function", name: "sqrt", argument };
+        }
+        case "EOF":
+          throw new CalcError("Unexpected end of input", token.position);
+        default:
+          throw new CalcError("Unexpected token: " + token.value, token.position);
+      }
+    }
+
+    try {
+      const node = expression();
+      if (current().type !== "EOF") {
+        throw new CalcError("Unexpected token: " + current().value, current().position);
+      }
+      return { kind: "success", node };
+    } catch (error) {
+      return { kind: "error", message: error.message || "Parse error" };
+    }
+  }
+
+  function evaluateNode(node, scope) {
+    switch (node.type) {
+      case "number": return node.value;
+      case "binary": {
+        const left = evaluateNode(node.left, scope);
+        const right = evaluateNode(node.right, scope);
+        switch (node.operator) {
+          case "ADD": return left + right;
+          case "SUBTRACT": return left - right;
+          case "MULTIPLY": return left * right;
+          case "DIVIDE":
+            if (right === 0) {
+              if (left === 0) throw new CalcError("NaN");
+              throw new CalcError(left < 0 ? "-∞" : "∞");
+            }
+            return left / right;
+          case "POWER": return Math.pow(left, right);
+          default: throw new CalcError("Evaluation error");
+        }
+      }
+      case "unaryMinus": return -evaluateNode(node.operand, scope);
+      case "percent": {
+        const percentage = evaluateNode(node.operand, scope) / 100;
+        return node.base != null ? evaluateNode(node.base, scope) * percentage : percentage;
+      }
+      case "variable":
+        if (Object.prototype.hasOwnProperty.call(scope.variables, node.name)) {
+          return scope.variables[node.name];
+        }
+        throw new CalcError("? $" + node.name);
+      case "lineRef":
+        if (Object.prototype.hasOwnProperty.call(scope.lineResults, node.lineNumber)) {
+          return scope.lineResults[node.lineNumber];
+        }
+        throw new CalcError("? $" + node.lineNumber);
+      case "assignment": {
+        const value = evaluateNode(node.expression, scope);
+        scope.variables[node.name] = value;
+        return value;
+      }
+      case "function": {
+        const argument = evaluateNode(node.argument, scope);
+        if (node.name.toLowerCase() === "sqrt") {
+          if (argument < 0) throw new CalcError("NaN");
+          return Math.sqrt(argument);
+        }
+        throw new CalcError("Unknown function: " + node.name);
+      }
+      default: throw new CalcError("Evaluation error");
+    }
+  }
+
+  function classifyLine(input) {
+    const trimmed = input.trim();
+    if (!trimmed) return "EMPTY";
+    if (trimmed.startsWith("#")) return "COMMENT";
+    return "EXPRESSION";
+  }
+
+  function evaluateSheet(sourceLines) {
+    const scope = { variables: Object.create(null), lineResults: Object.create(null) };
+    const results = [];
+    sourceLines.forEach((input, index) => {
+      const type = classifyLine(input);
+      if (type !== "EXPRESSION") {
+        results.push({ kind: "empty", text: "" });
+        return;
+      }
+      const parsed = parseExpression(input);
+      if (parsed.kind === "empty") {
+        results.push({ kind: "empty", text: "" });
+        return;
+      }
+      if (parsed.kind === "error") {
+        results.push({ kind: "error", text: formatError(parsed.message) });
+        return;
+      }
+      try {
+        const value = evaluateNode(parsed.node, scope);
+        const text = formatNumber(value);
+        // SheetEngine stores every successful result for later $N references.
+        scope.lineResults[index + 1] = value;
+        results.push({ kind: "success", value, text });
+      } catch (error) {
+        results.push({ kind: "error", text: formatError(error.message || "Evaluation error") });
+      }
+    });
+    currentVariables = { ...scope.variables };
+    return results;
+  }
+
+  function formatNumber(value) {
+    if (Number.isNaN(value)) return "NaN";
+    if (!Number.isFinite(value)) return value > 0 ? "∞" : "-∞";
+    if (Number.isInteger(value) && Math.abs(value) < 1e15) return String(value);
+    let formatted = value.toPrecision(10);
+    if (formatted.includes("e")) {
+      const parts = formatted.split("e");
+      parts[0] = parts[0].replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "");
+      return parts[0] + "e" + parts[1].replace(/^([+-])0+(\d)/, "$1$2");
+    }
+    return formatted.replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "");
+  }
+
+  function formatError(message) {
+    if (message === "∞" || message === "-∞" || message === "NaN") return message;
+    if (message.toLowerCase().includes("too many significant digits")) return "? digits";
+    if (message.toLowerCase().includes("undefined variable")) {
+      return "? " + (message.match(/\$\w+/) || [""])[0];
+    }
+    if (message.toLowerCase().includes("invalid line reference")) {
+      return "? " + (message.match(/\$\d+/) || [""])[0];
+    }
+    if (message.startsWith("?")) return message;
+    return "?";
+  }
+
+  function updateResultCells(results) {
+    const rows = linesElement.querySelectorAll(".line-row");
+    results.forEach((result, index) => {
+      const cell = rows[index]?.querySelector(".result");
+      if (!cell) return;
+      cell.textContent = result.text;
+      cell.dataset.copy = result.kind === "success" ? result.text : "";
+      cell.classList.toggle("error", result.kind === "error");
+      cell.classList.toggle("empty", result.kind === "empty");
+      cell.disabled = result.kind !== "success";
+      cell.setAttribute("aria-label", result.kind === "success" ? "Copy result " + result.text : result.text);
+    });
+    rows.forEach((row, index) => {
+      const field = row.querySelector(".expression");
+      field.classList.toggle("comment", classifyLine(inputs[index]) === "COMMENT");
+    });
+  }
+
+  function recalculate() {
+    const results = evaluateSheet(inputs);
+    updateResultCells(results);
+    return results;
+  }
+
+  // ---------------------------------------------------------------------------
+  // UI rendering and line editing (mirrors LineRow + SheetEngine)
+  // ---------------------------------------------------------------------------
+  function createLineRow(input, index, result) {
+    const row = document.createElement("div");
+    row.className = "line-row";
+
+    const number = document.createElement("div");
+    number.className = "line-number";
+    number.textContent = String(index + 1);
+
+    const inputBox = document.createElement("div");
+    inputBox.className = "input-box";
+
+    const field = document.createElement("textarea");
+    field.className = "expression";
+    field.rows = 1;
+    field.value = input;
+    field.autocomplete = "off";
+    field.autocapitalize = "off";
+    field.spellcheck = false;
+    field.setAttribute("aria-label", "Line " + (index + 1));
+    field.setAttribute("enterkeyhint", "next");
+    field.setAttribute("inputmode", useCustomKeyboard ? "none" : "text");
+    field.dataset.lineIndex = String(index);
+    field.addEventListener("focus", () => {
+      focusedLineIndex = index;
+      activeField = field;
+      saveSheet();
+    });
+    field.addEventListener("input", () => {
+      inputs[index] = field.value;
+      resizeField(field);
+      recalculate();
+      saveSheet();
+    });
+    field.addEventListener("keydown", event => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        insertNewLine(index + 1);
+      } else if (event.key === "Backspace" && field.value.length === 0 && inputs.length > 1) {
+        event.preventDefault();
+        deleteLine(index);
+      }
+    });
+    field.addEventListener("pointerdown", () => {
+      focusedLineIndex = index;
+      activeField = field;
+    });
+    inputBox.append(field);
+
+    const resultBox = document.createElement("div");
+    resultBox.className = "result-box";
+    const resultButton = document.createElement("button");
+    resultButton.type = "button";
+    resultButton.className = "result";
+    resultButton.textContent = result.text;
+    resultButton.dataset.copy = result.kind === "success" ? result.text : "";
+    resultButton.disabled = result.kind !== "success";
+    resultButton.addEventListener("click", () => {
+      if (resultButton.dataset.copy) copyText(resultButton.dataset.copy, "Copied: " + resultButton.dataset.copy);
+    });
+    resultBox.append(resultButton);
+
+    row.append(number, inputBox, resultBox);
+    resizeField(field);
+    return row;
+  }
+
+  function resizeField(field) {
+    field.style.height = "auto";
+    field.style.height = Math.max(24, field.scrollHeight) + "px";
+  }
+
+  function renderRows(options = {}) {
+    const results = evaluateSheet(inputs);
+    linesElement.innerHTML = "";
+    inputs.forEach((input, index) => {
+      linesElement.append(createLineRow(input, index, results[index]));
+    });
+    if (options.focus) {
+      requestAnimationFrame(() => {
+        const field = linesElement.querySelectorAll(".expression")[focusedLineIndex];
+        if (!field) return;
+        activeField = field;
+        field.setAttribute("inputmode", useCustomKeyboard ? "none" : "text");
+        field.focus({ preventScroll: true });
+        const position = options.cursorPosition == null ? field.value.length : options.cursorPosition;
+        field.setSelectionRange(position, position);
+        field.scrollIntoView({ block: "nearest" });
+        if (!useCustomKeyboard) field.focus();
+      });
+    }
+    saveSheet();
+  }
+
+  function getActiveField() {
+    const fields = linesElement.querySelectorAll(".expression");
+    let field = activeField && document.contains(activeField) ? activeField : fields[focusedLineIndex];
+    if (!field && fields.length) field = fields[0];
+    if (field) {
+      activeField = field;
+      focusedLineIndex = Number(field.dataset.lineIndex);
+    }
+    return field || null;
+  }
+
+  function insertTextAtCursor(text) {
+    const field = getActiveField();
+    if (!field) return;
+    const start = field.selectionStart == null ? field.value.length : field.selectionStart;
+    const end = field.selectionEnd == null ? start : field.selectionEnd;
+    const updated = field.value.slice(0, start) + text + field.value.slice(end);
+    inputs[focusedLineIndex] = updated;
+    field.value = updated;
+    resizeField(field);
+    recalculate();
+    field.focus({ preventScroll: true });
+    field.setSelectionRange(start + text.length, start + text.length);
+    activeField = field;
+    saveSheet();
+  }
+
+  function deleteAtCursor() {
+    const field = getActiveField();
+    if (!field) return;
+    const text = field.value;
+    const start = field.selectionStart == null ? text.length : field.selectionStart;
+    const end = field.selectionEnd == null ? start : field.selectionEnd;
+    let updated = text;
+    let cursor = start;
+
+    if (start !== end) {
+      updated = text.slice(0, start) + text.slice(end);
+    } else if (start > 0) {
+      const before = text.slice(0, start);
+      const count = before.endsWith("sqrt(") ? 5 : 1;
+      updated = text.slice(0, start - count) + text.slice(start);
+      cursor = start - count;
+    } else if (text.length === 0) {
+      deleteLine(focusedLineIndex);
+      return;
+    } else {
+      return;
+    }
+
+    inputs[focusedLineIndex] = updated;
+    field.value = updated;
+    resizeField(field);
+    recalculate();
+    field.focus({ preventScroll: true });
+    field.setSelectionRange(cursor, cursor);
+    saveSheet();
+  }
+
+  function clearCurrentLine() {
+    const field = getActiveField();
+    if (!field) return;
+    inputs[focusedLineIndex] = "";
+    field.value = "";
+    resizeField(field);
+    recalculate();
+    field.focus({ preventScroll: true });
+    field.setSelectionRange(0, 0);
+    saveSheet();
+  }
+
+  // The reference-shifting rules are copied from SheetEngine.kt:
+  // insertion shifts $N references at/after the inserted line; removal shifts
+  // references strictly after the removed line. References to the removed line
+  // remain unchanged and therefore become unresolved/self-references as in app.
+  function shiftReferencesForInsert(line, insertedLineNumber) {
+    return line.replace(/\$(\d+)/g, (match, digits) => {
+      const number = Number(digits);
+      return Number.isSafeInteger(number) && number >= insertedLineNumber
+        ? "$" + (number + 1)
+        : match;
+    });
+  }
+
+  function shiftReferencesForRemove(line, removedLineNumber) {
+    return line.replace(/\$(\d+)/g, (match, digits) => {
+      const number = Number(digits);
+      return Number.isSafeInteger(number) && number > removedLineNumber
+        ? "$" + (number - 1)
+        : match;
+    });
+  }
+
+  function insertNewLine(index) {
+    const safeIndex = Math.max(0, Math.min(index, inputs.length));
+    const insertedLineNumber = safeIndex + 1;
+    inputs = inputs.map(line => shiftReferencesForInsert(line, insertedLineNumber));
+    inputs.splice(safeIndex, 0, "");
+    focusedLineIndex = safeIndex;
+    useCustomKeyboard = true;
+    syncKeyboardMode();
+    renderRows({ focus: true, cursorPosition: 0 });
+  }
+
+  function deleteLine(index) {
+    if (index < 0 || index >= inputs.length) return;
+    if (inputs.length <= 1) {
+      inputs[0] = "";
+      focusedLineIndex = 0;
+      renderRows({ focus: true, cursorPosition: 0 });
+      return;
+    }
+    const removedLineNumber = index + 1;
+    inputs = inputs
+      .filter((_, lineIndex) => lineIndex !== index)
+      .map(line => shiftReferencesForRemove(line, removedLineNumber));
+    focusedLineIndex = Math.max(index - 1, 0);
+    renderRows({ focus: true });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Keyboard behaviour matches CalculatorKeyboard.kt (400 ms long press).
+  // ---------------------------------------------------------------------------
+  function setKeyboardMode(custom) {
+    useCustomKeyboard = Boolean(custom);
+    syncKeyboardMode();
+    const field = getActiveField();
+    if (field) {
+      field.setAttribute("inputmode", useCustomKeyboard ? "none" : "text");
+      if (useCustomKeyboard) {
+        field.blur();
+        requestAnimationFrame(() => field.focus({ preventScroll: true }));
+      } else {
+        requestAnimationFrame(() => field.focus());
+      }
+    }
+    saveSheet();
+  }
+
+  function syncKeyboardMode() {
+    $("keyboardPanel").style.display = useCustomKeyboard ? "" : "none";
+    $("keyboardIcon").innerHTML = useCustomKeyboard
+      ? '<path d="M20 5H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zM8 8h2v2H8V8zm-3 0h2v2H5V8zm0 3h2v2H5v-2zm3 0h2v2H8v-2zm3-3h2v2h-2V8zm0 3h2v2h-2v-2zm3-3h2v2h-2V8zm0 3h2v2h-2v-2zm3-3h2v2h-2V8zm0 3h2v2h-2v-2zm-11 5v-1h10v1H6z"/>'
+      : '<path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM8 7h2v2H8V7zm-3 0h2v2H5V7zm0 3h2v2H5v-2zm3 0h2v2H8v-2zm3-3h2v2h-2V7zm0 3h2v2h-2v-2zm3-3h2v2h-2V7zm3 0h2v2h-2V7zm-6 9H5v-2h6v2zm7 0h-5v-2h5v2zm-1-4h-2v-2h2v2zm-3 0h-2v-2h2v2z"/>';
+
+    $("keyboardToggle").setAttribute(
+      "aria-label",
+      useCustomKeyboard ? "Switch to system keyboard" : "Switch to calculator keyboard"
+    );
+  }
+
+  function handleKeyTap(key, button) {
+    switch (key) {
+      case "insert": insertTextAtCursor(button.dataset.value); break;
+      case "power": insertTextAtCursor("^"); break;
+      case "hash":
+        insertTextAtCursor("#");
+        setKeyboardMode(false);
+        break;
+      case "dollar":
+        insertTextAtCursor("$");
+        setKeyboardMode(false);
+        break;
+      case "backspace": deleteAtCursor(); break;
+      case "enter": insertNewLine(focusedLineIndex + 1); break;
+    }
+  }
+
+  function handleLongPress(key, button) {
+    switch (key) {
+      case "power": insertTextAtCursor("sqrt("); break;
+      case "backspace": clearCurrentLine(); break;
+      case "dollar": showVariablePicker(); break;
+    }
+  }
+
+  document.querySelectorAll(".key").forEach(button => {
+    const key = button.dataset.key;
+    let timer = null;
+    let longPressed = false;
+    const hasLongPress = ["power", "backspace", "dollar"].includes(key);
+
+    button.addEventListener("pointerdown", event => {
+      event.preventDefault();
+      longPressed = false;
+      button.setPointerCapture?.(event.pointerId);
+      if (hasLongPress) {
+        timer = window.setTimeout(() => {
+          longPressed = true;
+          button.classList.add("alt");
+          if (key === "power") button.textContent = "√";
+        }, 400);
+      }
+    });
+    const release = event => {
+      if (timer) { clearTimeout(timer); timer = null; }
+      if (longPressed) {
+        button.classList.remove("alt");
+        if (key === "power") button.textContent = "^";
+        handleLongPress(key, button);
+      } else {
+        handleKeyTap(key, button);
+      }
+      event.preventDefault();
+    };
+    button.addEventListener("pointerup", release);
+    button.addEventListener("pointercancel", () => {
+      if (timer) clearTimeout(timer);
+      timer = null;
+      longPressed = false;
+      button.classList.remove("alt");
+      if (key === "power") button.textContent = "^";
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Menu, dialogs, clipboard and theme preferences (DataStore equivalent).
+  // ---------------------------------------------------------------------------
+  function showToast(message) {
+    const toast = $("toast");
+    toast.textContent = message;
+    toast.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toast.classList.remove("show"), 1800);
+  }
+
+  async function copyText(text, message) {
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const temporary = document.createElement("textarea");
+        temporary.value = text;
+        temporary.style.position = "fixed";
+        temporary.style.opacity = "0";
+        document.body.append(temporary);
+        temporary.select();
+        document.execCommand("copy");
+        temporary.remove();
+      }
+      if (message) showToast(message);
+    } catch (_) {
+      showToast("Unable to copy");
+    }
+  }
+
+  function formatAllLines() {
+    const results = evaluateSheet(inputs);
+    return inputs.map((line, index) => {
+      if (classifyLine(line) === "EMPTY") return null;
+      if (classifyLine(line) === "COMMENT") return line;
+      const result = results[index].text;
+      return result ? line + " = " + result : line;
+    }).filter(line => line !== null).join("\n");
+  }
+
+  function openDialog(id) {
+    $("menu").classList.remove("open");
+    $(id).classList.add("open");
+  }
+
+  function closeDialogs() {
+    document.querySelectorAll(".dialog-scrim").forEach(dialog => dialog.classList.remove("open"));
+  }
+
+  function showVariablePicker() {
+    const names = Object.keys(currentVariables).sort();
+    $("variableEmpty").hidden = names.length > 0;
+    $("variablePickerContent").hidden = names.length === 0;
+    const list = $("variableList");
+    list.innerHTML = "";
+    names.forEach(name => {
+      const chip = document.createElement("button");
+      chip.className = "variable-chip";
+      chip.type = "button";
+      chip.textContent = "$" + name;
+      chip.addEventListener("click", () => {
+        closeDialogs();
+        insertTextAtCursor("$" + name);
+      });
+      list.append(chip);
+    });
+    openDialog("variableDialog");
+  }
+
+  function getStoredTheme() {
+    try { return localStorage.getItem(THEME_KEY) || "system"; }
+    catch (_) { return "system"; }
+  }
+
+  let themeMode = getStoredTheme();
+
+  function applyTheme(mode) {
+    themeMode = mode;
+    try { localStorage.setItem(THEME_KEY, mode); } catch (_) {}
+    const dark = mode === "dark" ||
+      (mode === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+    document.documentElement.dataset.theme = dark ? "dark" : "light";
+    document.querySelectorAll('input[name="theme"]').forEach(radio => {
+      radio.checked = radio.value === mode;
+    });
+  }
+
+  window.matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", () => {
+    if (themeMode === "system") applyTheme("system");
+  });
+
+  $("keyboardToggle").addEventListener("click", () => setKeyboardMode(!useCustomKeyboard));
+  $("menuToggle").addEventListener("click", event => {
+    event.stopPropagation();
+    $("menu").classList.toggle("open");
+  });
+
+  $("menu").addEventListener("click", event => {
+    const button = event.target.closest("[data-menu]");
+    if (!button) return;
+    switch (button.dataset.menu) {
+      case "copy": {
+        const text = formatAllLines();
+        if (text.length) copyText(text, "Copied all lines");
+        $("menu").classList.remove("open");
+        break;
+      }
+      case "clear":
+        inputs = [""];
+        focusedLineIndex = 0;
+        useCustomKeyboard = true;
+        syncKeyboardMode();
+        renderRows({ focus: true, cursorPosition: 0 });
+        $("menu").classList.remove("open");
+        break;
+      case "guide": openDialog("guideDialog"); break;
+      case "settings": openDialog("settingsDialog"); break;
+      case "about": openDialog("aboutDialog"); break;
+    }
+  });
+
+  document.querySelectorAll("[data-close]").forEach(button => {
+    button.addEventListener("click", closeDialogs);
+  });
+  document.querySelectorAll(".dialog-scrim").forEach(scrim => {
+    scrim.addEventListener("click", event => {
+      if (event.target === scrim) closeDialogs();
+    });
+  });
+  document.querySelectorAll('input[name="theme"]').forEach(radio => {
+    radio.addEventListener("change", () => applyTheme(radio.value));
+  });
+
+  document.addEventListener("click", event => {
+    if (!event.target.closest("#menu") && !event.target.closest("#menuToggle")) {
+      $("menu").classList.remove("open");
+    }
+  });
+  document.addEventListener("keydown", event => {
+    if (event.key === "Escape") {
+      closeDialogs();
+      $("menu").classList.remove("open");
+    }
+  });
+
+  // ---------------------------------------------------------------------------
+  // Start with the restored sheet and system theme.
+  // ---------------------------------------------------------------------------
+  loadSheet();
+  applyTheme(themeMode);
+  renderRows();
+  syncKeyboardMode();
+})();
+</script>
+</body>
+</html>
