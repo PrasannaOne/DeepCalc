@@ -7,7 +7,7 @@
   const SHEET_KEY = "soulcalc.web.sheet.v1";
   const THEME_KEY = "soulcalc.web.theme.v1";
   let inputs = [""];
-  let notes = [];
+  let notes = [""];
   let savedSheets = [];
   let sheetNameMode = "save";
   let renamingSheetId = null;
@@ -81,6 +81,7 @@
   // layer. Keep expression behaviour aligned with Lexer.kt / Parser.kt /
   // Evaluator.kt / SheetEngine.kt rather than using JavaScript eval().
   // ---------------------------------------------------------------------------
+  // Numeric literal precision helpers. These intentionally avoid JavaScript eval().
   function significantDigits(literal) {
     const digits = literal.replace(/\D/g, "");
     const first = [...digits].findIndex(ch => ch !== "0");
@@ -432,12 +433,15 @@
     return "?";
   }
 
+  // Render complete result strings. CSS allows long values to wrap instead of truncating.
   function updateResultCells(results) {
     const rows = linesElement.querySelectorAll(".line-row");
     results.forEach((result, index) => {
       const cell = rows[index]?.querySelector(".result");
       if (!cell) return;
       cell.textContent = result.text;
+      // Keep the full value available to assistive technology and long-press users.
+      cell.title = result.kind === "success" ? result.text : "";
       cell.dataset.copy = result.kind === "success" ? result.text : "";
       cell.classList.toggle("error", result.kind === "error");
       cell.classList.toggle("empty", result.kind === "empty");
@@ -532,6 +536,7 @@
     resultButton.type = "button";
     resultButton.className = "result";
     resultButton.textContent = result.text;
+    resultButton.title = result.kind === "success" ? result.text : "";
     resultButton.dataset.copy = result.kind === "success" ? result.text : "";
     resultButton.disabled = result.kind !== "success";
     resultButton.addEventListener("click", () => {
@@ -911,14 +916,22 @@
     }).filter(Boolean).join("\n");
   }
 
+  // Share copy stays short; Open Graph metadata supplies the rich link preview.
   async function shareDeepCalc() {
-    const payload = { title: "DeepCalc", text: "DeepCalc\nThink it. Note it. Calculate it.", url: "https://prasannaone.github.io/DeepCalc/" };
+    // Keep the share message complementary to the link preview. The preview carries
+    // the product name, tagline and artwork, so the message only explains the app.
+    const payload = {
+      title: "DeepCalc",
+      text: "A notepad calculator for thoughts, notes and calculations.",
+      url: "https://prasannaone.github.io/DeepCalc/"
+    };
     try {
       if (navigator.share) await navigator.share(payload);
       else await copyText(payload.text + "\n" + payload.url, "Share text copied");
     } catch (error) { if (error && error.name !== "AbortError") showToast("Sharing unavailable"); }
   }
 
+  // Explicit History records are separate from the automatically saved active sheet.
   function saveCurrentSheet(title) {
     const cleanedTitle = String(title || "").trim() || suggestedSheetTitle();
     const record = {

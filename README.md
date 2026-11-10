@@ -2,61 +2,61 @@
 
 **Think it. Note it. Calculate it.**
 
-DeepCalc is a notepad-style calculator for working through expressions, live results, variables and independent notes in one place.
+DeepCalc is a notepad-style calculator for expressions, live results, variables and independent notes.
 
 ## Features
 
-- Multiline calculations with live results.
-- Arithmetic, percentages, parentheses, powers and square roots.
-- Named variables and references to previous calculation lines.
-- Comments, automatic recalculation and local autosave.
-- Built-in calculator keyboard, with optional device keyboard for expressions.
+- Multiline calculations, live results, variables and previous-line references.
+- Arithmetic, percentages, parentheses, powers, square roots and comments.
+- Built-in calculator keyboard, with an optional device keyboard for expressions.
 - Independent notes that use the device keyboard.
 - Copy Sheet and Copy Complete.
 - Explicitly saved sheets with History, rename, reopen and delete.
-- System, Light, Dark and AMOLED themes, plus accent palettes.
+- System, Light, Dark and true-black AMOLED themes with five coordinated palettes.
 - Installable PWA with offline app-shell support and automatic update checks.
+- Responsive layout for phones, tablets and desktop screens.
 
-## Project files
+## Root files
 
-All files are kept in the repository root for easy editing and uploading from GitHub's mobile interface.
+All files intentionally stay in the repository root. No asset folders are required.
 
-| File | Purpose |
+| File | What it contains |
 | --- | --- |
-| `index.html` | App structure, metadata, dialogs and entry point. |
-| `styles.css` | All layout, themes, palettes and responsive styling. |
-| `app.js` | Calculator engine, sheet editing, notes, History, clipboard and app interactions. |
-| `manifest.webmanifest` | PWA name, icons, scope and install behaviour. |
-| `service-worker.js` | Offline app shell, cache management and fresh deployment fetching. |
-| `icon-192.png`, `icon-512.png`, `icon-maskable-512.png` | Standard and maskable PWA launcher icons. |
-| `apple-touch-icon.png`, `favicon-32.png` | Apple home-screen and browser tab icons. |
-| `og-image.png` | 1200 × 630 social-sharing preview. |
-| `LICENSE` | Retained original MIT licence and attribution. |
+| `index.html` | Page structure, metadata, dialogs and app entry point. |
+| `styles.css` | Layout, responsive rules, themes, palette tokens and visual states. |
+| `app.js` | State, storage, calculator parser/evaluator, editing, notes, History and sharing. |
+| `manifest.webmanifest` | Install identity, display settings and icon declarations. |
+| `service-worker.js` | Offline app shell, cache versioning and update lifecycle. |
+| `icon-192.png`, `icon-512.png`, `icon-maskable-512.png` | PWA launcher artwork. |
+| `apple-touch-icon.png`, `favicon-32.png` | Apple home-screen and browser tab artwork. |
+| `og-image.png` | Social preview artwork (1200 × 630). |
+| `LICENSE` | Original MIT licence and copyright notice. Keep it intact. |
 
-## Editing guide
+## Code map
 
-- Change the interface or visual styling in `styles.css`.
-- Change calculator behaviour and interactions in `app.js`. The parser/evaluator section is deliberately isolated and documented; avoid changing it unless modifying calculation behaviour is intended.
-- Change app metadata, dialogs or page structure in `index.html`.
-- When publishing a new release, update the cache name in `service-worker.js` (for example, `deepcalc-shell-v8`) and update the `?v=7` query on `styles.css` and `app.js` in `index.html` and `service-worker.js`. This ensures installed copies fetch the new assets.
-- Keep all paths and file names exactly as written. GitHub Pages paths are case-sensitive.
+- **`index.html`**: edit labels, dialogs and metadata. Keep file paths root-relative.
+- **`styles.css`**: edit visual design. The V8 release section at the bottom contains the coordinated palette tokens and long-result responsive rules.
+- **`app.js`**: major sections are labelled. The lexer/parser/evaluator is isolated from the interface. Avoid changing it unless calculator semantics are being deliberately changed.
+- **`service-worker.js`**: core files must remain in `CORE_FILES`. Optional images are cached best-effort. Increment `CACHE_NAME` for every release and update the `?v=` values in `index.html` and the service worker together.
 
-## Run locally
+## Local testing
 
-A PWA requires HTTPS or localhost. From this directory, run:
+A PWA requires HTTPS or localhost. From this directory:
 
 ```bash
 python -m http.server 8000
 ```
 
-Then open `http://localhost:8000/` in a modern browser.
+Open `http://localhost:8000/` in a modern browser. Test calculations, line references, notes, keyboard modes, copy/share, History, theme changes, offline startup and an update from the previous deployed version before publishing.
 
-Calculation sheets and saved History are stored locally in the browser and do not automatically sync across devices.
+## Data and privacy
+
+The active sheet, preferences and saved History are stored in this browser's local storage. They survive normal reloads and app updates, but they do not sync between devices. Clearing site data or using a different browser/device can remove or leave behind those records. Export or copy important work before clearing browser data.
 
 ## Credits
 
-Web adaptation and ongoing development: [PrasannaOne](https://github.com/PrasannaOne)
+Web adaptation and ongoing development: [PrasannaOne](https://github.com/PrasannaOne).
 
 Based on [SoulCalc](https://github.com/tigrino/soulcalc), originally created by Albert “Tigr” Zenkoff. The original MIT licence and copyright notice are retained.
 
-Project repository: [PrasannaOne/DeepCalc](https://github.com/PrasannaOne/DeepCalc)
+Project repository: [PrasannaOne/DeepCalc](https://github.com/PrasannaOne/DeepCalc).

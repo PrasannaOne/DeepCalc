@@ -22,7 +22,7 @@
 html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--surface);color:var(--on-surface);font-family:Roboto,"Segoe UI",Arial,sans-serif}
 button,input{font:inherit}
 button{color:inherit}
-.app{height:100dvh;min-height:0;width:100%;display:flex;flex-direction:column;background:var(--surface);padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+.app{height:100vh;height:100dvh;min-height:0;width:100%;display:flex;flex-direction:column;background:var(--surface);padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 .topbar{height:64px;min-height:64px;display:flex;align-items:center;padding:0 4px 0 16px;background:var(--surface);position:relative;z-index:3}
 .app-title{font-size:22px;line-height:28px;font-weight:400;letter-spacing:0}
 .top-actions{margin-left:auto;display:flex;align-items:center;height:100%;gap:0}
@@ -262,3 +262,81 @@ html[data-theme="amoled"][data-accent="amber"]{--brand-accent:#ffda98;--note-acc
 
 /* Long copied expressions remain readable without pushing the toast off-screen. */
 .toast{max-width:calc(100vw - 32px);overflow:hidden;text-overflow:ellipsis}
+
+
+/* ---------------------------------------------------------------------------
+   V8 release polish
+   - Long results wrap and grow vertically; they are never clipped with an ellipsis.
+   - Accent palettes are complete, coordinated colour systems, not just swatches.
+   - Neutral surfaces remain calm so the calculator stays readable for long sessions.
+   --------------------------------------------------------------------------- */
+.line-row{align-items:stretch}
+.input-box{align-self:stretch;min-height:32px}
+.result-box{
+  align-self:stretch;
+  min-height:32px;
+  height:auto;
+  overflow:visible;
+  align-items:center;
+  justify-content:flex-end;
+  padding:5px 9px;
+}
+.result{
+  display:block;
+  width:100%;
+  max-width:100%;
+  min-width:0;
+  height:auto;
+  min-height:24px;
+  white-space:normal;
+  overflow:visible;
+  overflow-wrap:anywhere;
+  word-break:break-word;
+  text-overflow:clip;
+  text-align:right;
+  line-height:1.35;
+}
+.result:disabled{opacity:1}
+/* Each palette defines title/result accents and the calculator's operator keys. */
+:root[data-accent="purple"]{--brand-accent:#7650c8;--primary:#6944b8;--primary-container:#e8defb;--secondary-container:#e6dcf8;--on-secondary-container:#352052;--key-accent:#6e48bd;--key-accent-text:#fff;--digit-key-tint:#f1edf8}
+:root[data-accent="blue"]{--brand-accent:#356fc2;--primary:#3269b5;--primary-container:#dce9fb;--secondary-container:#d9e6f8;--on-secondary-container:#17365d;--key-accent:#326bb9;--key-accent-text:#fff;--digit-key-tint:#edf3fb}
+:root[data-accent="emerald"]{--brand-accent:#21815e;--primary:#207653;--primary-container:#d9f0e5;--secondary-container:#d4eee2;--on-secondary-container:#123e2d;--key-accent:#247b59;--key-accent-text:#fff;--digit-key-tint:#edf6f1}
+:root[data-accent="rose"]{--brand-accent:#b34e78;--primary:#a9436d;--primary-container:#f8dfe9;--secondary-container:#f5dce6;--on-secondary-container:#542238;--key-accent:#ad4c75;--key-accent-text:#fff;--digit-key-tint:#fbf0f4}
+:root[data-accent="amber"]{--brand-accent:#a66a16;--primary:#98600f;--primary-container:#f7e7c9;--secondary-container:#f5e4c3;--on-secondary-container:#4e350f;--key-accent:#a66a16;--key-accent-text:#fff;--digit-key-tint:#faf4e9}
+/* Dark mode keeps the same palette identity while raising luminance for contrast. */
+:root[data-theme="dark"][data-accent="purple"]{--brand-accent:#c7a9ff;--primary:#d0b9ff;--primary-container:#302344;--secondary-container:#403052;--on-secondary-container:#f3eaff;--key-accent:#7650c8;--key-accent-text:#fff;--digit-key-tint:#191620}
+:root[data-theme="dark"][data-accent="blue"]{--brand-accent:#a9caff;--primary:#b6d1ff;--primary-container:#1e304b;--secondary-container:#293f60;--on-secondary-container:#e9f2ff;--key-accent:#376eb9;--key-accent-text:#fff;--digit-key-tint:#151a22}
+:root[data-theme="dark"][data-accent="emerald"]{--brand-accent:#91dfba;--primary:#a0e6c5;--primary-container:#1c3a2e;--secondary-container:#28513f;--on-secondary-container:#e2fff0;--key-accent:#287c59;--key-accent-text:#fff;--digit-key-tint:#141d19}
+:root[data-theme="dark"][data-accent="rose"]{--brand-accent:#ffb1cc;--primary:#ffc0d5;--primary-container:#452333;--secondary-container:#5b3044;--on-secondary-container:#ffedf3;--key-accent:#a94a73;--key-accent-text:#fff;--digit-key-tint:#20161b}
+:root[data-theme="dark"][data-accent="amber"]{--brand-accent:#ffd18a;--primary:#ffda9f;--primary-container:#46351d;--secondary-container:#5b4528;--on-secondary-container:#fff3dd;--key-accent:#a66a16;--key-accent-text:#fff;--digit-key-tint:#201b13}
+/* AMOLED uses true black for the app canvas, with distinct raised controls. */
+:root[data-theme="amoled"]{--surface:#000;--input-bg:#17151d;--surface-variant:#17141d;--outline:#625b6c;--menu-shadow:0 10px 34px #000d}
+:root[data-theme="amoled"][data-accent="purple"]{--brand-accent:#d1b7ff;--primary:#d6c1ff;--primary-container:#21152f;--secondary-container:#342044;--on-secondary-container:#f4eaff;--key-accent:#7446bd;--key-accent-text:#fff;--digit-key-tint:#0d0b11}
+:root[data-theme="amoled"][data-accent="blue"]{--brand-accent:#b2d0ff;--primary:#c0d8ff;--primary-container:#14243b;--secondary-container:#1e3553;--on-secondary-container:#edf5ff;--key-accent:#326bb9;--key-accent-text:#fff;--digit-key-tint:#080d14}
+:root[data-theme="amoled"][data-accent="emerald"]{--brand-accent:#9ae8c4;--primary:#a8efd0;--primary-container:#102c21;--secondary-container:#1a4232;--on-secondary-container:#e7fff3;--key-accent:#247b59;--key-accent-text:#fff;--digit-key-tint:#07100c}
+:root[data-theme="amoled"][data-accent="rose"]{--brand-accent:#ffbad1;--primary:#ffc6da;--primary-container:#351725;--secondary-container:#4b2637;--on-secondary-container:#fff0f5;--key-accent:#ad4c75;--key-accent-text:#fff;--digit-key-tint:#12080d}
+:root[data-theme="amoled"][data-accent="amber"]{--brand-accent:#ffda9b;--primary:#ffe0aa;--primary-container:#332512;--secondary-container:#4b361b;--on-secondary-container:#fff5e2;--key-accent:#a66a16;--key-accent-text:#fff;--digit-key-tint:#100c06}
+/* Slight tint on numeric keys makes each palette visible without colouring the whole UI. */
+.key.digit{background:color-mix(in srgb,var(--surface) 78%,var(--brand-accent) 22%);color:var(--on-surface)}
+.palette-swatch.purple{background:linear-gradient(145deg,#d9c5ff,#7041c2)}
+.palette-swatch.blue{background:linear-gradient(145deg,#c1dcff,#326bb9)}
+.palette-swatch.emerald{background:linear-gradient(145deg,#b8efd5,#247b59)}
+.palette-swatch.rose{background:linear-gradient(145deg,#ffd2e1,#ad4c75)}
+.palette-swatch.amber{background:linear-gradient(145deg,#ffe5ad,#a66a16)}
+/* Narrow screens: preserve enough room for both the expression and complete result. */
+@media(max-width:430px){
+  .line-number{flex-basis:15px;padding-right:6px}
+  .input-box{flex:6 1 0}
+  .result-box{flex:4 1 0;margin-left:6px;padding-left:5px;padding-right:6px}
+  .result{font-size:15px;letter-spacing:0}
+}
+@media(max-width:350px){
+  .line-row{padding-left:4px;padding-right:4px}
+  .input-box{padding-left:6px;padding-right:20px}
+  .result-box{margin-left:4px;padding-left:3px;padding-right:4px}
+  .result{font-size:14px}
+}
+
+/* Keyboard and accessibility refinements. */
+button:focus-visible,textarea:focus-visible,input:focus-visible{outline:2px solid var(--brand-accent);outline-offset:2px}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition-duration:.01ms!important;animation-duration:.01ms!important;animation-iteration-count:1!important}}
