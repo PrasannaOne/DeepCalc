@@ -1,0 +1,40 @@
+/*
+  DeepCalc result wrapping fix.
+  Append this block at the VERY END of the existing styles.css.
+  It replaces the old single-line/ellipsis behaviour without changing
+  the calculator's layout, themes, or keypad.
+*/
+.line-row {
+  align-items: stretch;
+}
+
+.result-box {
+  align-self: stretch;
+  min-width: 0;
+  min-height: 32px;
+  height: auto;
+  overflow: visible;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 5px 9px;
+}
+
+.result {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  height: auto;
+  min-height: 24px;
+  white-space: normal;
+  overflow: visible;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  text-overflow: clip;
+  text-align: right;
+  line-height: 1.35;
+}
+
+.result:disabled {
+  opacity: 1;
+}
