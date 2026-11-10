@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -170,7 +170,24 @@ jobs:
                "android/.idea/*" \
                "android/.git/*"
 
-      - name: Upload all builds
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: deepcalc-v1.0.${{ github.run_number }}
+          name: DeepCalc v1.0.${{ github.run_number }}
+          target_commitish: ${{ github.sha }}
+          generate_release_notes: true
+          make_latest: true
+          fail_on_unmatched_files: true
+          files: |
+            output/DeepCalc-debug.apk
+            output/DeepCalc-release-universal.apk
+            output/DeepCalc-release.aab
+            output/DeepCalc-Android-Source.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Actions backup
         uses: actions/upload-artifact@v7
         with:
           name: DeepCalc-Android-Complete
