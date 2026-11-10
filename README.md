@@ -126,6 +126,6 @@ Open [http://localhost:8000](http://localhost:8000). A local server is preferabl
 
 ## Credits
 
-DeepCalc is a web adaptation and ongoing project by [PrasannaOne](https://github.com/PrasannaOne).
+DeepCalc is a web adaptation project by [PrasannaOne](https://github.com/PrasannaOne).
 
 It is based on [SoulCalc](https://github.com/tigrino/soulcalc), originally created by **Albert “Tigr” Zenkoff**. The original MIT licence and copyright notice are retained in this repository.
