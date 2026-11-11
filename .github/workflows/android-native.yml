@@ -1,3 +1,4 @@
+
 name: DeepCalc Native Android
 
 on:
@@ -103,9 +104,9 @@ jobs:
       - name: Run tests and build APK variants
         working-directory: DeepCalc-Android
         run: |
-          gradle --no-daemon --stacktrace --warning-mode=all \\
-            :app:testDebugUnitTest \\
-            :app:assembleDebug \\
+          gradle --no-daemon --stacktrace --warning-mode=all \
+            :app:testDebugUnitTest \
+            :app:assembleDebug \
             :app:assembleRelease
 
       - name: Build Android App Bundle
@@ -113,8 +114,8 @@ jobs:
         run: |
           # The AAB contains all ABIs and does not need parallel APK splits.
           # Build it separately to avoid AGP's multi-APK/resource-shrinker conflict.
-          gradle --no-daemon --stacktrace --warning-mode=all \\
-            -Pdeepcalc.abiSplits=false \\
+          gradle --no-daemon --stacktrace --warning-mode=all \
+            -Pdeepcalc.abiSplits=false \
             :app:bundleRelease
 
       - name: Collect build outputs
@@ -215,3 +216,4 @@ jobs:
           name: DeepCalc-Native-Android
           path: output/**
           retention-days: 30
+          
