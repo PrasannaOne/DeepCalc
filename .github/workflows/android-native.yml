@@ -1,0 +1,85 @@
+name: DeepCalc Native Android
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'DeepCalc-Android-Source.zip'
+      - 'DeepCalc-Android/**'
+      - '.github/workflows/android-native.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+      - name: Install native project folder from uploaded ZIP
+        run: |
+          if [ -f DeepCalc-Android-Source.zip ]; then
+            unzip -t DeepCalc-Android-Source.zip
+            rm -rf DeepCalc-Android
+            unzip -q DeepCalc-Android-Source.zip -d .
+            test -f DeepCalc-Android/settings.gradle.kts
+            test -f DeepCalc-Android/app/build.gradle.kts
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add DeepCalc-Android
+            git rm -f DeepCalc-Android-Source.zip
+            if ! git diff --cached --quiet; then
+              git commit -m "Add isolated DeepCalc native Android project"
+              git push
+            fi
+          else
+            test -f DeepCalc-Android/settings.gradle.kts
+            test -f DeepCalc-Android/app/build.gradle.kts
+          fi
+      - name: Set up Java
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: platform-tools
+      - name: Install Android platform and build tools
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '8.13'
+      - name: Decode release signing key (when configured)
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/deepcalc-release.jks"
+            echo "DEEPCALC_KEYSTORE_FILE=$RUNNER_TEMP/deepcalc-release.jks" >> "$GITHUB_ENV"
+            echo "DEEPCALC_KEYSTORE_PASSWORD=$ANDROID_KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
+            echo "DEEPCALC_KEY_ALIAS=$ANDROID_KEY_ALIAS" >> "$GITHUB_ENV"
+            echo "DEEPCALC_KEY_PASSWORD=$ANDROID_KEY_PASSWORD" >> "$GITHUB_ENV"
+          fi
+      - name: Run tests and build APK/AAB
+        working-directory: DeepCalc-Android
+        run: gradle --no-daemon :app:testDebugUnitTest :app:assembleDebug :app:assembleRelease :app:bundleRelease
+      - name: Collect build outputs
+        run: |
+          mkdir -p output
+          cp DeepCalc-Android/app/build/outputs/apk/debug/*.apk output/DeepCalc-Native-debug.apk
+          cp DeepCalc-Android/app/build/outputs/apk/release/*.apk output/DeepCalc-Native-release.apk
+          cp DeepCalc-Android/app/build/outputs/bundle/release/*.aab output/DeepCalc-Native-release.aab
+          cp -r DeepCalc-Android/app/build/reports/tests/testDebugUnitTest output/test-reports
+      - name: Upload APK, AAB and test reports
+        uses: actions/upload-artifact@v7
+        with:
+          name: DeepCalc-Native-Android
+          path: output/**
+          retention-days: 30
+          
