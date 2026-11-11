@@ -69,21 +69,3 @@ kotlin {
         jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
     }
 }
-
-
-// Reuse the exact 512px PWA artwork from the repository root for the Android launcher.
-// The native-source ZIP intentionally does not duplicate this asset.
-val generateDeepCalcLauncherIcon by tasks.registering(Copy::class) {
-    val webIcon = rootProject.projectDir.parentFile.resolve("icon-512.png")
-    from(webIcon)
-    into(layout.buildDirectory.dir("generated/deepcalcIconRes/drawable-nodpi"))
-    rename { "deepcalc_icon.png" }
-}
-
-android.sourceSets.getByName("main").res.srcDir(
-    layout.buildDirectory.dir("generated/deepcalcIconRes")
-)
-
-tasks.named("preBuild").configure {
-    dependsOn(generateDeepCalcLauncherIcon)
-}
