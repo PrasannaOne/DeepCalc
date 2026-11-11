@@ -5,7 +5,7 @@ plugins {
 
 android {
     namespace = "com.prasannaone.deepcalc"
-    compileSdk = 37
+    compileSdk = 36
 
     val releaseKeyStore = System.getenv("DEEPCALC_KEYSTORE_FILE")
     val releaseSigningAvailable = !releaseKeyStore.isNullOrBlank()
@@ -24,7 +24,7 @@ android {
     defaultConfig {
         applicationId = "com.prasannaone.deepcalc"
         minSdk = 23
-        targetSdk = 37
+        targetSdk = 36
         versionCode = 2
         versionName = "2.0.0-native-preview"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -62,8 +62,6 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
 }
 
-// AGP 9 provides Kotlin compilation itself. Keep the bytecode target at Java 17
-// so the app remains compatible with its minSdk while CI runs on JDK 21.
 kotlin {
     compilerOptions {
         jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
