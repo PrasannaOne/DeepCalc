@@ -1,0 +1,42 @@
+# Copy this file to fdroiddata/metadata/com.prasannaone.deepcalc.yml
+# only after the upstream v2.1.0 tag exists and points to the final source commit.
+Categories:
+  - Science & Education
+License: MIT
+AuthorName: Prasanna (PrasannaOne)
+AuthorWebSite: https://github.com/PrasannaOne
+SourceCode: https://github.com/PrasannaOne/DeepCalc
+IssueTracker: https://github.com/PrasannaOne/DeepCalc/issues
+Changelog: https://github.com/PrasannaOne/DeepCalc/releases
+AutoName: DeepCalc
+Summary: Line-by-line calculator with live results
+Description: |
+  A native Android calculation workspace for working things out line by line.
+  Includes live results, reusable variables, earlier-result references,
+  per-line notes, a dedicated keypad, local sheet history, themes and palettes.
+
+  No Internet permission, ads or analytics SDKs. Calculations and saved sheets
+  are stored locally. Sharing uses the Android chooser and only happens when
+  the user selects a share target.
+  .
+MaintainerNotes: |
+  The Android Gradle Plugin is 9.3.0 and requires Gradle 9.5.0 or newer.
+  Upstream CI currently builds with Gradle 9.7.0 and JDK 21.
+  The build disables ABI splits to produce one universal APK for F-Droid.
+  .
+
+RepoType: git
+Repo: https://github.com/PrasannaOne/DeepCalc
+Builds:
+  - versionName: 2.1.0
+    versionCode: 4
+    commit: REPLACE_WITH_FINAL_40_CHARACTER_COMMIT_SHA
+    subdir: DeepCalc-Android
+    gradle:
+      - "yes"
+    gradleprops:
+      - deepcalc.abiSplits=false
+UpdateCheckMode: Tags
+CurrentVersion: 2.1.0
+CurrentVersionCode: 4
+AutoUpdateMode: Version

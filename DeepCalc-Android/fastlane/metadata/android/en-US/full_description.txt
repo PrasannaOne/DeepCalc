@@ -1,0 +1,15 @@
+DeepCalc is a focused calculation workspace for working things out, line by line. It is a native Android app built with Kotlin and Jetpack Compose.
+
+Features:
+• Live results beside each expression
+• Reusable variables and references to earlier results
+• Powers, square roots, percentages and comments
+• Separate notes beside calculations
+• Dedicated calculator keypad and Android keyboard support
+• Autosaved active sheet and local History for up to 100 sheets
+• Copy Sheet, Copy Complete and Android's native Share menu
+• System, Light, Dark and AMOLED themes with five accent palettes
+
+DeepCalc does not request Internet access and contains no ads or analytics SDKs. Calculations, notes and saved sheets stay on your device.
+
+Made by Prasanna. Built on the original SoulCalc project by Albert “Tigr” Zenkoff. Licensed under MIT; original attribution is retained.

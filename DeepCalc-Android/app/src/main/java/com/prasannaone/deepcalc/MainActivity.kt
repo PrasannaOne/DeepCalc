@@ -16,6 +16,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -23,7 +25,6 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Keyboard
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Smartphone
@@ -58,17 +59,15 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
 import java.text.DateFormat
-import java.text.SimpleDateFormat
 import java.util.Date
-import java.util.Locale
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -91,8 +90,7 @@ private data class AppSnapshot(
     val focus: Int,
     val savedSheets: List<SavedSheet>,
     val theme: String,
-    val accent: String,
-    val customKeyboard: Boolean
+    val accent: String
 )
 
 private object LocalStore {
@@ -117,12 +115,11 @@ private object LocalStore {
             }
         }.getOrDefault(emptyList())
         return AppSnapshot(lines, notes, focus, history,
-            p.getString("theme", "system") ?: "system", p.getString("accent", "purple") ?: "purple",
-            p.getBoolean("custom_keyboard", true))
+            p.getString("theme", "system") ?: "system", p.getString("accent", "purple") ?: "purple")
     }
 
     fun save(context: Context, lines: List<String>, notes: List<String>, focus: Int,
-             history: List<SavedSheet>, theme: String, accent: String, customKeyboard: Boolean) {
+             history: List<SavedSheet>, theme: String, accent: String) {
         val activeLines = JSONArray().apply { lines.forEach { put(it) } }.toString()
         val activeNotes = JSONArray().apply { lines.indices.forEach { put(notes.getOrElse(it) { "" }) } }.toString()
         val records = JSONArray().apply {
@@ -136,8 +133,7 @@ private object LocalStore {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
             .putString("active_lines", activeLines).putString("active_notes", activeNotes)
             .putInt("focus", focus).putString("history", records)
-            .putString("theme", theme).putString("accent", accent)
-            .putBoolean("custom_keyboard", customKeyboard).apply()
+            .putString("theme", theme).putString("accent", accent).remove("custom_keyboard").apply()
     }
 
     private fun JSONArray.toStrings(): List<String> = (0 until length()).map { optString(it, "") }
@@ -179,6 +175,7 @@ private fun DeepCalcApp() {
     val initial = remember { LocalStore.load(context) }
     val clipboard = LocalClipboardManager.current
     val keyboard = LocalSoftwareKeyboardController.current
+    val coroutineScope = rememberCoroutineScope()
     val systemDark = androidx.compose.foundation.isSystemInDarkTheme()
     val configuration = LocalConfiguration.current
     val shortScreen = configuration.screenHeightDp <= 700
@@ -194,7 +191,7 @@ private fun DeepCalcApp() {
     var notes by remember { mutableStateOf(initial.notes) }
     var savedSheets by remember { mutableStateOf(initial.savedSheets) }
     var focusedLine by remember { mutableIntStateOf(initial.focus) }
-    var customKeyboard by remember { mutableStateOf(initial.customKeyboard) }
+    var customKeyboard by remember { mutableStateOf(true) }
     var noteFocused by remember { mutableStateOf(false) }
     var focusedNoteIndex by remember { mutableStateOf<Int?>(null) }
     var themeMode by remember { mutableStateOf(initial.theme) }
@@ -234,7 +231,7 @@ private fun DeepCalcApp() {
         onSurface = colors.text, onSurfaceVariant = colors.muted, error = colors.error,
         outline = colors.outline)
 
-    fun persist() = LocalStore.save(context, currentLines, notes, focusedLine, savedSheets, themeMode, accentMode, customKeyboard)
+    fun persist() = LocalStore.save(context, currentLines, notes, focusedLine, savedSheets, themeMode, accentMode)
     fun showToast(message: String) { toast = message; toastVisible = true }
     fun closeDialog() { activeDialog = null }
     fun copyText(value: String, message: String) {
@@ -324,22 +321,35 @@ private fun DeepCalcApp() {
         expandedNotes = emptySet(); focusedLine = lineFields.lastIndex; customKeyboard = true; noteFocused = false; focusedNoteIndex = null
         persist(); closeDialog(); focusEpoch++; showToast("Opened “${item.title}”")
     }
-    fun openRepository() {
-        val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://github.com/PrasannaOne/DeepCalc"))
-        context.startActivity(intent)
+    fun shareApp() {
+        val shareIntent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_SUBJECT, "DeepCalc")
+            putExtra(Intent.EXTRA_TEXT, "Write it. Work it out. See it unfold.\nhttps://github.com/PrasannaOne/DeepCalc")
+        }
+        context.startActivity(Intent.createChooser(shareIntent, "Share DeepCalc"))
     }
 
     LaunchedEffect(toastVisible, toast) {
         if (toastVisible) { delay(1800); toastVisible = false }
     }
+    LaunchedEffect(customKeyboard, noteFocused, activeDialog) {
+        when {
+            activeDialog == "save" -> keyboard?.show()
+            activeDialog != null -> keyboard?.hide()
+            noteFocused -> keyboard?.show()
+            customKeyboard -> keyboard?.hide()
+            else -> keyboard?.show()
+        }
+    }
     LaunchedEffect(activeDialog) {
         if (activeDialog == "save") {
-            delay(80)
+            delay(100)
             runCatching { sheetNameRequester.requestFocus() }
             keyboard?.show()
         }
     }
-    LaunchedEffect(currentLines, notes, focusedLine, savedSheets, themeMode, accentMode, customKeyboard) { persist() }
+    LaunchedEffect(currentLines, notes, focusedLine, savedSheets, themeMode, accentMode) { persist() }
 
     val platformViewConfiguration = LocalViewConfiguration.current
     val deepCalcViewConfiguration = remember(platformViewConfiguration) {
@@ -351,24 +361,18 @@ private fun DeepCalcApp() {
     CompositionLocalProvider(LocalViewConfiguration provides deepCalcViewConfiguration) {
       MaterialTheme(colorScheme = colorScheme) {
       Box(Modifier.fillMaxSize().background(colors.surface)) {
-        Column(Modifier.fillMaxSize().background(colors.surface).statusBarsPadding().navigationBarsPadding()) {
+        Column(Modifier.fillMaxSize().background(colors.surface).statusBarsPadding().navigationBarsPadding().imePadding()) {
             // Header mirrors the 58–62dp DeepCalc top bar.
             Row(Modifier.widthIn(max = 960.dp).fillMaxWidth().align(Alignment.CenterHorizontally).height(topBarHeight)
                 .padding(start = if (compactWidth) 15.dp else 20.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("DeepCalc", color = colors.primary, fontSize = if (compactWidth) 21.sp else 22.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.5).sp)
                 Spacer(Modifier.weight(1f))
                 IconButton(onClick = {
+                    // The header switch controls calculation fields only. Notes
+                    // always use the Android keyboard.
                     customKeyboard = !customKeyboard
-                    if (noteFocused) {
-                        // Notes always use the Android keyboard, regardless of the
-                        // preferred keyboard mode for calculation fields.
-                        keyboard?.show()
-                    } else {
-                        focusEpoch++
-                        if (customKeyboard) keyboard?.hide() else keyboard?.show()
-                    }
                     persist()
-                }) {
+                }, enabled = !noteFocused) {
                     Icon(if (customKeyboard) Icons.Filled.Keyboard else Icons.Filled.Smartphone,
                         contentDescription = if (customKeyboard) "Switch to system keyboard" else "Switch to calculator keyboard",
                         tint = colors.muted)
@@ -388,7 +392,7 @@ private fun DeepCalcApp() {
                         DropdownMenuItem(text = { Text("Settings") }, onClick = { menuExpanded = false; activeDialog = "settings" })
                         HorizontalDivider(color = colors.variant)
                         MenuHeader("MORE", colors)
-                        DropdownMenuItem(text = { Text("GitHub repository") }, onClick = { menuExpanded = false; openRepository() })
+                        DropdownMenuItem(text = { Text("Share") }, onClick = { menuExpanded = false; shareApp() })
                         DropdownMenuItem(text = { Text("About") }, onClick = { menuExpanded = false; activeDialog = "about" })
                     }
                 }
@@ -398,7 +402,11 @@ private fun DeepCalcApp() {
             Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(top = 8.dp, bottom = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 lineFields.forEachIndexed { index, fieldValue ->
                     if (index in expandedNotes) {
-                        Row(Modifier.widthIn(max = 960.dp).fillMaxWidth().padding(start = if (compactWidth) 28.dp else 40.dp, end = if (compactWidth) 7.dp else 12.dp, bottom = 3.dp), verticalAlignment = Alignment.Top) {
+                        val noteBringIntoViewRequester = remember(index) { BringIntoViewRequester() }
+                        Row(Modifier.widthIn(max = 960.dp).fillMaxWidth()
+                            .bringIntoViewRequester(noteBringIntoViewRequester)
+                            .padding(start = if (compactWidth) 28.dp else 40.dp, end = if (compactWidth) 7.dp else 12.dp, bottom = 3.dp),
+                            verticalAlignment = Alignment.Top) {
                             Text("⌃", modifier = Modifier.width(22.dp).padding(top = 1.dp), color = colors.primary, fontSize = 12.sp)
                             Column(Modifier.weight(1f).padding(start = 9.dp).borderStart(colors.noteAccent)) {
                                 val noteRequester = remember(index) { FocusRequester() }
@@ -411,12 +419,19 @@ private fun DeepCalcApp() {
                                 BasicTextField(value = notes.getOrElse(index) { "" }, onValueChange = { value ->
                                     notes = notes.toMutableList().also { while (it.size <= index) it.add(""); it[index] = value }; persist()
                                 }, modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 21.dp).heightIn(max = 100.dp).focusRequester(noteRequester)
-                                    .onFocusChanged {
-                                        noteFocused = it.isFocused
-                                        if (it.isFocused) {
+                                    .onFocusChanged { focusState ->
+                                        if (focusState.isFocused) {
+                                            noteFocused = true
                                             focusedNoteIndex = index
                                             keyboard?.show()
-                                        } else if (focusedNoteIndex == index) focusedNoteIndex = null
+                                            coroutineScope.launch {
+                                                delay(260)
+                                                noteBringIntoViewRequester.bringIntoView()
+                                            }
+                                        } else if (focusedNoteIndex == index) {
+                                            noteFocused = false
+                                            focusedNoteIndex = null
+                                        }
                                     },
                                     textStyle = TextStyle(color = colors.text, fontSize = 12.sp, lineHeight = 19.sp),
                                     cursorBrush = SolidColor(colors.primary), keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Default),
@@ -425,15 +440,20 @@ private fun DeepCalcApp() {
                         }
                     }
                     val requester = remember(index) { FocusRequester() }
-                    LaunchedEffect(focusEpoch) {
-                        if (focusEpoch > 0 && focusedLine == index) {
-                            runCatching { requester.requestFocus() }
-                            if (customKeyboard && !noteFocused) keyboard?.hide() else keyboard?.show()
+                    val lineBringIntoViewRequester = remember(index) { BringIntoViewRequester() }
+                    LaunchedEffect(focusEpoch, customKeyboard, noteFocused, focusedLine, activeDialog) {
+                        if (activeDialog == null && !noteFocused && focusedLine == index) {
+                            if (focusEpoch > 0) runCatching { requester.requestFocus() }
+                            delay(180)
+                            lineBringIntoViewRequester.bringIntoView()
                         }
                     }
                     val result = results.getOrNull(index) ?: CalculatorEngine.LineResult(CalculatorEngine.LineResult.Kind.EMPTY, "")
                     val isComment = fieldValue.text.trimStart().startsWith("#")
-                    Row(Modifier.widthIn(max = 960.dp).fillMaxWidth().padding(horizontal = if (compactWidth) 6.dp else 12.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Row(Modifier.widthIn(max = 960.dp).fillMaxWidth()
+                        .bringIntoViewRequester(lineBringIntoViewRequester)
+                        .padding(horizontal = if (compactWidth) 6.dp else 12.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically) {
                         Box(
                             modifier = Modifier.width(if (compactWidth) 24.dp else 28.dp).height(36.dp)
                                 .clip(RoundedCornerShape(7.dp))
@@ -456,7 +476,8 @@ private fun DeepCalcApp() {
                                         focusedLine = index
                                         noteFocused = false
                                         focusedNoteIndex = null
-                                        if (customKeyboard) keyboard?.hide() else keyboard?.show()
+                                        customKeyboard = true
+                                        keyboard?.hide()
                                     }
                                 },
                                 textStyle = TextStyle(color = if (isComment) colors.muted else colors.text, fontSize = if (compactWidth) 14.sp else 15.sp,
@@ -471,10 +492,9 @@ private fun DeepCalcApp() {
                                 noteFocused = !closingNotes
                                 focusedNoteIndex = if (noteFocused) index else null
                                 if (closingNotes) {
-                                    keyboard?.hide()
+                                    focusedLine = index
+                                    customKeyboard = true
                                     focusEpoch++
-                                } else {
-                                    keyboard?.show()
                                 }
                                 persist()
                             }, modifier = Modifier.size(32.dp)) {
@@ -590,13 +610,13 @@ private fun DeepCalcApp() {
                     } } }, confirmButton = { TextButton(onClick = { closeDialog() }) { Text("Cancel", color = colors.primary) } })
             "settings" -> AlertDialog(onDismissRequest = { closeDialog() }, containerColor = colors.raised,
                 title = { Text("Settings", color = colors.text) },
-                text = { Column(Modifier.verticalScroll(rememberScrollState())) {
+                text = { Column {
                     Text("Theme", color = colors.muted, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.height(5.dp))
                     Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(13.dp)).background(colors.input).padding(4.dp),
                         horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         listOf("system" to "System", "light" to "Light", "dark" to "Dark", "amoled" to "AMOLED").forEach { (value, label) ->
-                            Box(Modifier.weight(1f).defaultMinSize(minHeight = 39.dp).clip(RoundedCornerShape(10.dp))
+                            Box(Modifier.weight(1f).defaultMinSize(minHeight = 35.dp).clip(RoundedCornerShape(10.dp))
                                 .background(if (themeMode == value) colors.raised else Color.Transparent)
                                 .border(1.dp, if (themeMode == value) colors.primary.copy(alpha = .35f) else Color.Transparent, RoundedCornerShape(10.dp))
                                 .clickable { themeMode = value; persist() }.padding(horizontal = 2.dp), contentAlignment = Alignment.Center) {
@@ -605,20 +625,20 @@ private fun DeepCalcApp() {
                             }
                         }
                     }
-                    Spacer(Modifier.height(18.dp)); Text("Palettes", color = colors.muted, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(12.dp)); Text("Palettes", color = colors.muted, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(5.dp))
                     val paletteNames = listOf("purple" to "Purple", "blue" to "Sapphire", "emerald" to "Jade", "rose" to "Ruby", "amber" to "Gold")
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                         paletteNames.forEach { (value, label) ->
                             Column(Modifier.weight(1f).clip(RoundedCornerShape(11.dp))
                                 .background(if (accentMode == value) colors.primary.copy(alpha = .08f) else Color.Transparent)
-                                .clickable { accentMode = value; persist() }.padding(vertical = 8.dp, horizontal = 1.dp),
+                                .clickable { accentMode = value; persist() }.padding(vertical = 5.dp, horizontal = 1.dp),
                                 horizontalAlignment = Alignment.CenterHorizontally) {
-                                Box(Modifier.size(30.dp).border(2.dp, if (accentMode == value) colors.primary else colors.outline.copy(alpha = .14f), CircleShape)
+                                Box(Modifier.size(26.dp).border(2.dp, if (accentMode == value) colors.primary else colors.outline.copy(alpha = .14f), CircleShape)
                                     .padding(2.dp).clip(CircleShape).background(palette(themeMode, value, systemDark).primary), contentAlignment = Alignment.Center) {
                                     if (accentMode == value) Text("✓", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                                 }
-                                Spacer(Modifier.height(7.dp))
+                                Spacer(Modifier.height(4.dp))
                                 Text(label, color = colors.muted, fontSize = if (compactWidth) 9.sp else 10.sp, maxLines = 1)
                             }
                         }
@@ -630,7 +650,7 @@ private fun DeepCalcApp() {
                     GuideSection("Basics", "Type mathematical expressions and see results instantly. Use +, −, ×, ÷ for basic operations, ^ for power, and % for percentage.", colors)
                     GuideSection("Variables", "Define variables with \$name = value\nExample: \$tax = 0.08\nUse them in expressions: 100 × \$tax", colors)
                     GuideSection("Line References", "Reference previous results with $1, $2, etc.\nExample: If line 1 equals 50, then $1 × 2 = 100", colors)
-                    GuideSection("Keyboard", "^ — Power (hold for √ square root)\n$ — Variables (hold for picker)\n# — Start a comment\n⌫ — Backspace (hold to clear line)\n⏎ — New line", colors)
+                    GuideSection("Keyboard", "Calculation fields open the DeepCalc keypad by default. Use the header keyboard button to switch the focused calculation to your Android keyboard. Notes always use the Android keyboard; returning to a calculation switches back to the DeepCalc keypad.\n\n^ — Power (hold for √ square root)\n$ — Variables (hold for picker)\n# — Start a comment\n⌫ — Backspace (hold to clear line)\n⏎ — New line", colors)
                     GuideSection("Notes", "Use the small arrow beside a calculation to open its note. Notes are separate from calculations and do not affect results or line references. Notes use your device keyboard.", colors)
                     GuideSection("Copy and Save", "Copy Sheet copies calculations. Copy Complete includes calculations and their notes. Save Sheet stores a separate snapshot in History.", colors)
                     GuideSection("History", "Open History to reopen saved sheets, rename them, or delete them. Your active sheet is autosaved separately.", colors)
@@ -638,16 +658,23 @@ private fun DeepCalcApp() {
             "about" -> AlertDialog(onDismissRequest = { closeDialog() }, containerColor = colors.raised,
                 title = { Text("About DeepCalc", color = colors.text) },
                 text = { Column {
-                    Text("A native Android calculator workspace for expressions, variables, line references and notes. Results update as you work, while sheets and history stay saved on your device.",
-                        color = colors.text, fontSize = 13.sp, lineHeight = 20.sp)
+                    Text("A focused space for working things out, line by line. Write expressions, follow live results, reuse variables, reference earlier answers and keep notes beside your calculations. Your sheets stay on your device.",
+                        color = colors.text, fontSize = 13.sp, lineHeight = 19.sp)
+                    Spacer(Modifier.height(13.dp))
+                    Text("Made by Prasanna ♥️", color = colors.primary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.height(12.dp))
-                    Text("Native Android app", color = colors.primary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    Text("MADE WITH", color = colors.muted, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.1.sp)
+                    Spacer(Modifier.height(4.dp))
+                    Text("Native Android · Kotlin · Jetpack Compose · Material 3", color = colors.text, fontSize = 12.sp, lineHeight = 17.sp)
+                    Spacer(Modifier.height(11.dp))
+                    Text("ORIGINAL CREDIT", color = colors.muted, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.1.sp)
+                    Spacer(Modifier.height(4.dp))
+                    Text("DeepCalc builds on the original SoulCalc project by Albert “Tigr” Zenkoff. The original MIT licence and required attribution are preserved.",
+                        color = colors.text, fontSize = 12.sp, lineHeight = 17.sp)
                     Spacer(Modifier.height(8.dp))
-                    Text("Built by PrasannaOne, based on the DeepCalc web app and the original SoulCalc project by Albert “Tigr” Zenkoff. Original MIT licence and attribution are retained.",
-                        color = colors.muted, fontSize = 12.sp, lineHeight = 18.sp)
+                    Text("Open source · MIT License", color = colors.muted, fontSize = 11.sp)
                 } },
-                confirmButton = { TextButton(onClick = { closeDialog() }) { Text("Done", color = colors.muted) } },
-                dismissButton = { TextButton(onClick = { openRepository() }) { Text("GitHub repository", color = colors.primary) } })
+                confirmButton = { TextButton(onClick = { closeDialog() }) { Text("Done", color = colors.primary) } })
             else -> Unit
         }
 

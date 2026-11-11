@@ -1,0 +1,1 @@
+Final native polish: reliable keyboard focus, focused-row visibility, compact Settings, improved About credits and native Share menu.

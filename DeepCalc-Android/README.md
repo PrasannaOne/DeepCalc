@@ -1,55 +1,60 @@
-# DeepCalc Native Android
+# DeepCalc for Android
 
-A standalone native Android edition of DeepCalc built with Kotlin and Jetpack Compose. It lives in `DeepCalc-Android/` and does not replace or modify the web/PWA application at the repository root.
+**DeepCalc is a native Android calculation workspace**, made by Prasanna. It is not a WebView wrapper. The Android app is built with Kotlin and Jetpack Compose, with a dedicated expression engine and a purpose-built calculator keyboard.
 
-## Features
+## What it does
 
-- Multiline notepad calculator with live per-line results.
-- DeepCalc expression syntax: `+`, `−`, `×`, `÷`, `%`, `^`, `sqrt(...)`, variables (`$name`), line references (`$1`) and comments (`#`).
-- Contextual percentages and line-reference shifting when rows are inserted or removed.
-- Per-line notes, a dedicated calculator keyboard, Android system keyboard for notes, manual keyboard switching, cursor operations and long-press actions.
-- Autosaved active sheet and local History (up to 100 sheets), with open, rename and delete.
-- Copy Sheet, Copy Complete, copy expression/result from the line number or result, GitHub repository shortcut, Guide and About.
-- System, Light, Dark and AMOLED themes with five accent palettes.
-- Adaptive Compose layout with scrollable content and width-aware sizing.
+- Work through calculations line by line, with live results beside each expression.
+- Define reusable variables such as `$tax = 0.08` and reference earlier results with `$1`, `$2`, and so on.
+- Use powers, square roots, percentages, comments, cursor editing and paired parentheses.
+- Attach a separate note to any calculation without affecting its result.
+- Switch between the DeepCalc keypad for calculations and the Android keyboard for notes. The header switch can temporarily select the Android keyboard for a calculation field.
+- Autosave the active sheet locally and keep up to 100 named sheets in History.
+- Copy a sheet or the complete sheet with notes; Share opens Android's native share chooser with the app tagline and source link.
+- Choose System, Light, Dark or AMOLED appearance, with five accent palettes.
 
-## Toolchain
+## Privacy
 
-- Android Gradle Plugin 9.3.0
-- Gradle 9.7.0
-- Kotlin 2.4.21 with the Compose compiler Gradle plugin
-- Android SDK 36 / Android 16
-- Java 17 app bytecode target; GitHub Actions builds on Temurin JDK 21
-- Jetpack Compose stable BOM 2026.06.01
-- AndroidX Lifecycle 2.10.0, Activity Compose 1.13.0 and Coroutines 1.11.0
+- The Android manifest does not request the `INTERNET` permission.
+- The app includes no advertising, analytics, Firebase or Google Play Services SDKs.
+- Calculations, notes, preferences and saved sheets are stored locally on the device.
+- The Share action only sends the app tagline and public repository URL to another app after the user chooses a share target.
 
-AGP 9's built-in Kotlin support is enabled. The legacy `org.jetbrains.kotlin.android` plugin is intentionally not applied.
+## Technology
 
-## Release builds
+- Kotlin and Jetpack Compose
+- Material 3
+- AndroidX Activity Compose and Lifecycle
+- Kotlin Coroutines
+- Android SDK 36; minimum Android API 23
 
-Release builds enable R8 code optimisation and resource shrinking. Unused library code and resources are removed while preserving the app's referenced features.
-
-The release build produces:
-- `DeepCalc-Universal.apk`: one APK containing all supported ABIs.
-- `DeepCalc-arm64-v8a.apk`: for modern 64-bit ARM phones.
-- `DeepCalc-armeabi-v7a.apk`: for older 32-bit ARM devices.
-- `DeepCalc-x86.apk` and `DeepCalc-x86_64.apk`: for compatible Intel-based devices and emulators.
-- `DeepCalc-release.aab`: for Google Play distribution; Play generates device-targeted installs from the bundle.
-
-For a normal modern Android phone, choose `DeepCalc-arm64-v8a.apk`. Use the universal APK when the device architecture is unknown. Do not install the `x86` variants on ARM phones.
-
-The GitHub Actions artifact also contains a size report showing each APK's file size, uncompressed DEX size and native-library size. Release signing is applied when the repository secrets `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` and `ANDROID_KEY_PASSWORD` are configured. No signing key or password is included in this source archive.
+The expression parser and evaluator live in `app/src/main/java/com/prasannaone/deepcalc/CalculatorEngine.kt`. The UI, local sheet storage, keyboard coordination, menus and dialogs live in `MainActivity.kt`.
 
 ## Build
 
-Requirements: JDK 21, Android SDK Platform 36 and Android Build Tools 36.0.0. The repository-level GitHub Actions workflow runs the APK and AAB builds separately. The APK invocation leaves ABI splits enabled; the AAB invocation uses `-Pdeepcalc.abiSplits=false` because the bundle already carries all ABIs and should not generate parallel APK split outputs in the same invocation.
+Build requirements: JDK 21, Android SDK Platform 36, Android Build Tools 36.0.0 and Gradle 9.7.0. The Android Gradle Plugin is 9.3.0, which requires Gradle 9.5.0 or newer.
 
-## One-ZIP source update workflow
+From this directory:
 
-Upload one file named exactly `DeepCalc-Android-Source.zip` to the repository root. The archive must contain the top-level `DeepCalc-Android/` folder. The repository-level workflow extracts and replaces the existing native source folder, removes the uploaded ZIP from the repository and builds the app.
+```bash
+gradle --no-daemon :app:testDebugUnitTest
+gradle --no-daemon :app:assembleRelease
+```
 
-The root workflow file `.github/workflows/android-native.yml` must be updated separately; GitHub does not discover workflow files nested inside the native project folder.
+To create a single universal APK instead of ABI split APKs:
 
-## Launcher icon
+```bash
+gradle --no-daemon -Pdeepcalc.abiSplits=false :app:assembleRelease
+```
 
-The native app uses an Android adaptive launcher icon built from the existing DeepCalc artwork. API 26+ devices use separate foreground and background layers; API 23–25 devices use matching density-specific PNG fallbacks. The existing PWA icons and assets are not modified.
+The repository-level GitHub Actions workflow runs unit tests, debug/release APK builds, and a separate AAB build. The APK job creates universal, ARM64, ARMv7, x86 and x86_64 variants. The AAB is intended for Google Play; F-Droid builds and signs its own APK from source.
+
+## F-Droid preparation
+
+The project uses the MIT licence and its runtime manifest requests no network permission. Fastlane listing text and icon assets are included in `fastlane/metadata/android/en-US/`. A draft F-Droid metadata file is included under `fdroid/` for maintainers to copy into the `fdroiddata` repository.
+
+Before submitting, publish the final source commit and create the matching `v2.1.0` Git tag. Then replace the tag reference in the F-Droid metadata draft with the exact release tag/commit. F-Droid's maintainers still need to review the project and verify that their build environment supports the project's Android Gradle Plugin and Gradle versions; inclusion is not automatic.
+
+## Credits and licence
+
+DeepCalc's Android edition is made by PrasannaOne. It builds on the original SoulCalc project by Albert “Tigr” Zenkoff. The MIT licence and original attribution are retained; see `LICENSE`.

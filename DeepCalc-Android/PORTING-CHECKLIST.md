@@ -1,34 +1,28 @@
-# DeepCalc Android port checklist
+# DeepCalc Android final-release checklist
 
-The current DeepCalc web app is the behavioural reference. The native project is isolated in `DeepCalc-Android/`.
+This checklist distinguishes source changes from checks that require a real Android device or CI run.
 
-| Area | Native implementation | Status |
+| Area | Final source state | Verification status |
 |---|---|---|
-| Multi-line sheet and live results | `MainActivity.kt` + `CalculatorEngine.kt` | Implemented in source; device comparison pending |
-| Expression parser and evaluator | `CalculatorEngine.kt` | Implemented; targeted JVM smoke checks passed; full CI test rerun pending |
-| Contextual percentages | `CalculatorEngine.kt` | Test cases authored; 10/11 passed in the previous CI attempt; corrected expectation and expanded boundary cases pending rerun |
-| Powers, roots, unary minus and formatting | `CalculatorEngine.kt` | Test cases authored; 10/11 passed in the previous CI attempt; corrected expectation and expanded boundary cases pending rerun |
-| Variables and line references | `CalculatorEngine.kt` | Test cases authored; 10/11 passed in the previous CI attempt; corrected expectation and expanded boundary cases pending rerun |
-| Comments and empty lines | `CalculatorEngine.kt` | Implemented; comparison pending |
-| Reference shifting | `CalculatorEngine.kt` + line editing | Implemented; comparison pending |
-| Per-line notes and custom keyboard | `MainActivity.kt` | Implemented in source; device comparison pending |
-| Long press, paste, cursor and paired parentheses | `MainActivity.kt` | Implemented in source; device testing pending |
-| Copy, Guide, About and repository shortcut | `MainActivity.kt` | Implemented in source; device testing pending |
-| Autosave and History (100 sheets) | Local SharedPreferences | Implemented in source; process-death test pending |
-| Themes and five accent palettes | Compose palette mapping | Implemented in source; visual comparison pending |
-| Phone/tablet/landscape adaptation | Compose constraints and scrolling | Implemented in source; visual test matrix pending |
+| Calculation engine | Preserved without changes in this release pass | Existing JUnit suite passed on the previous GitHub build; rerun against this release source |
+| Keyboard focus | Calculation fields default to the DeepCalc keypad; notes always use Android IME; header switch applies to calculation fields | Requires device verification |
+| Keyboard viewport | Focused calculation and note rows use bring-into-view requests; app layout applies IME insets | Requires device verification on short and tall screens |
+| Share | Native Android chooser shares the tagline and repository URL | Requires device verification |
+| About | Product description, Made by Prasanna, Kotlin/Compose/Material 3 stack and SoulCalc attribution | Source updated |
+| Settings | Theme and five palettes compacted into one non-scrollable page | Requires device verification on narrow/short screens |
+| Autosave and History | Existing local persistence and 100-sheet history retained | Regression test required |
+| Themes and palettes | System, Light, Dark, AMOLED; Purple, Sapphire, Jade, Ruby, Gold | Regression test required |
+| APK/AAB packaging | Existing GitHub Actions workflow builds all ABI APKs and a separate AAB | Previous source passed CI; final source must pass CI after upload |
+| F-Droid | MIT metadata draft and Fastlane listing assets included | Submission/tag/review still required |
 
-## Required checks before calling it complete
+## Release verification still required
 
-- Run the GitHub Actions build and JUnit test task successfully.
-- Compare the same expression corpus in web and native versions, including result formatting and error strings.
-- Test cursor replacement, line insertion/deletion, reference shifts, note focus, keyboard switching and long press.
-- Save, close, reopen and edit sheets; verify notes and all History entries survive process death.
-- Test narrow and large phones, tablets, portrait, landscape, split-screen, short-height windows and larger system fonts.
-- Test TalkBack, touch targets, clipboard and rotation while editing.
+- Upload the final source ZIP and wait for the repository's Android workflow to complete successfully.
+- Install the ARM64 APK and test calculation input, note input, keyboard switching, last-line visibility, rotation, split-screen and short-height layouts.
+- Test Share and confirm Android's native share chooser appears with the exact tagline and repository URL.
+- Confirm About credits and Settings fit on a single page at phone width and with larger font settings.
+- Save, reopen, rename and delete sheets; verify notes and active-sheet autosave survive app restart.
+- Verify the release APK's package ID, version name/code and signature before publishing.
+- Create the `v2.1.0` tag on the exact final source commit before preparing the F-Droid submission.
 
-Do not claim full parity until these checks pass.
-
-- Verify the adaptive icon and its legacy launcher fallbacks on Android 6 through current Android versions.
-- Verify that release R8/resource shrinking preserves calculator, notes, history, themes and clipboard behavior.
-- Compare universal and per-ABI APK sizes; confirm the AAB builds separately with ABI APK splits disabled.
+Do not describe the final source as device-verified or F-Droid-approved until those checks have actually passed.
