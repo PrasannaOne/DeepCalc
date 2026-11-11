@@ -20,16 +20,16 @@ This project uses a pinned, mutually compatible modern toolchain:
 - Android Gradle Plugin 9.3.0
 - Gradle 9.7.0
 - Kotlin 2.4.21 with the Compose compiler Gradle plugin
-- Android SDK 37 / Android 17
+- Android SDK 36 / Android 16
 - Java 17 app bytecode target; GitHub Actions builds on Temurin JDK 21
-- Jetpack Compose stable BOM 2026.09.00
-- AndroidX Lifecycle 2.11.0, Activity Compose 1.13.0 and Coroutines 1.11.0
+- Jetpack Compose stable BOM 2026.06.01 (Compose 1.11.x)
+- AndroidX Lifecycle 2.10.0, Activity Compose 1.13.0 and Coroutines 1.11.0
 
 AGP 9's built-in Kotlin support is enabled. The legacy `org.jetbrains.kotlin.android` plugin is intentionally not applied. Gradle 9.7.0 is selected because it is within Kotlin 2.4.21's documented fully supported Gradle range. Android's AGP documentation lists Gradle 9.5.0 as the minimum for AGP 9.3.0.
 
 ## Build
 
-Requirements: JDK 21, Android SDK Platform 37 and Android Build Tools 36.0.0. The repository-level GitHub Actions workflow installs these and runs:
+Requirements: JDK 21, Android SDK Platform 36 and Android Build Tools 36.0.0. The repository-level GitHub Actions workflow installs these and runs:
 
 ```bash
 gradle --no-daemon :app:testDebugUnitTest :app:assembleDebug :app:assembleRelease :app:bundleRelease
@@ -43,4 +43,4 @@ Upload one file named exactly `DeepCalc-Android-Source.zip` to the repository ro
 
 ## Verification status
 
-The previous CI run compiled the Kotlin and Android sources and reached unit tests; 10 of 11 tests passed. The remaining failure was an incorrect test expectation that contradicted the current web app's own formatter. This source archive corrects that expectation and adds integer-format boundary coverage. The next GitHub Actions run is the authoritative verification of the updated AGP/Kotlin/Gradle/SDK toolchain and complete APK/AAB build. UI parity, device testing, accessibility and process-death testing still require runtime validation on Android devices or emulators.
+The previous CI run reached Android dependency metadata checks and failed because Compose 1.12.1 requires compileSdk 37 while the runner installed API 36. This source revision pins the stable Compose 1.11 line and keeps compileSdk/targetSdk at API 36. Calculator-engine tests were corrected to match the actual contextual-percentage evaluation in the source. The next GitHub Actions run must verify dependency resolution, compilation, unit tests, and APK/AAB packaging. This archive has not been represented as a successful Android build; UI parity, device testing, accessibility and process-death testing still require runtime validation on Android devices or emulators.

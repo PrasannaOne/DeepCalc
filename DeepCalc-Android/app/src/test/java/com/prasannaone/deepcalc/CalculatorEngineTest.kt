@@ -1,7 +1,6 @@
 package com.prasannaone.deepcalc
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class CalculatorEngineTest {
@@ -11,6 +10,7 @@ class CalculatorEngineTest {
         assertEquals("110", result("100 + 10%"))
         assertEquals("90", result("100 - 10%"))
         assertEquals("10", result("100 × 10%"))
+        assertEquals("60.5", result("50 + 10% + 10%"))
         assertEquals("0.1", result("10%"))
     }
 
