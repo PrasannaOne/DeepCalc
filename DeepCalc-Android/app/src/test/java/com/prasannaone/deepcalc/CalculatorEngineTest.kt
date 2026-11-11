@@ -63,9 +63,11 @@ class CalculatorEngineTest {
 
     @Test fun numberFormattingMatchesJavaScriptPrecisionBoundaries() {
         assertEquals("1000000000", result("1000000000"))
-        assertEquals("1e+10", result("10000000000"))
+        assertEquals("10000000000", result("10000000000"))
         assertEquals("0.000001", result("0.000001"))
         assertEquals("1e-7", result("0.0000001"))
+        assertEquals("999999999999999", result("999999999999999"))
+        assertEquals("1e+15", result("1000000000000000"))
     }
 
     @Test fun unicodeDigitsAreRejectedLikeTheWebLexer() {

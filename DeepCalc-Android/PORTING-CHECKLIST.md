@@ -5,10 +5,10 @@ The current DeepCalc web app is the behavioural reference. The native project is
 | Area | Native implementation | Status |
 |---|---|---|
 | Multi-line sheet and live results | `MainActivity.kt` + `CalculatorEngine.kt` | Implemented in source; device comparison pending |
-| Expression parser and evaluator | `CalculatorEngine.kt` | Implemented; Gradle tests not yet run |
-| Contextual percentages | `CalculatorEngine.kt` | Test cases authored; execution pending |
-| Powers, roots, unary minus and formatting | `CalculatorEngine.kt` | Test cases authored; execution pending |
-| Variables and line references | `CalculatorEngine.kt` | Test cases authored; execution pending |
+| Expression parser and evaluator | `CalculatorEngine.kt` | Implemented; targeted JVM smoke checks passed; full CI test rerun pending |
+| Contextual percentages | `CalculatorEngine.kt` | Test cases authored; 10/11 passed in the previous CI attempt; corrected expectation and expanded boundary cases pending rerun |
+| Powers, roots, unary minus and formatting | `CalculatorEngine.kt` | Test cases authored; 10/11 passed in the previous CI attempt; corrected expectation and expanded boundary cases pending rerun |
+| Variables and line references | `CalculatorEngine.kt` | Test cases authored; 10/11 passed in the previous CI attempt; corrected expectation and expanded boundary cases pending rerun |
 | Comments and empty lines | `CalculatorEngine.kt` | Implemented; comparison pending |
 | Reference shifting | `CalculatorEngine.kt` + line editing | Implemented; comparison pending |
 | Per-line notes and custom keyboard | `MainActivity.kt` | Implemented in source; device comparison pending |
