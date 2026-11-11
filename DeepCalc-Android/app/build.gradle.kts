@@ -3,6 +3,12 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+// ABI APK splits are disabled only for the AAB-only build invocation.
+// This keeps the AAB clean while the APK build still emits every ABI.
+val abiSplitsEnabled = providers.gradleProperty("deepcalc.abiSplits")
+    .map { it.toBoolean() }
+    .getOrElse(true)
+
 android {
     namespace = "com.prasannaone.deepcalc"
     compileSdk = 36
@@ -25,13 +31,27 @@ android {
         applicationId = "com.prasannaone.deepcalc"
         minSdk = 23
         targetSdk = 36
-        versionCode = 2
-        versionName = "2.0.0-native-preview"
+        versionCode = 3
+        versionName = "2.0.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    // Keep the original device coverage while producing focused downloads.
+    // The universal APK contains all four ABIs; split APKs contain one each.
+    splits {
+        abi {
+            isEnable = abiSplitsEnabled
+            reset()
+            include("arm64-v8a", "armeabi-v7a", "x86", "x86_64")
+            isUniversalApk = true
+        }
     }
 
     buildTypes {
         getByName("release") {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
             if (releaseSigningAvailable) signingConfig = signingConfigs.getByName("deepcalcRelease")
         }
     }

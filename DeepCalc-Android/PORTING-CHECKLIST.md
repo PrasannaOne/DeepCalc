@@ -13,7 +13,7 @@ The current DeepCalc web app is the behavioural reference. The native project is
 | Reference shifting | `CalculatorEngine.kt` + line editing | Implemented; comparison pending |
 | Per-line notes and custom keyboard | `MainActivity.kt` | Implemented in source; device comparison pending |
 | Long press, paste, cursor and paired parentheses | `MainActivity.kt` | Implemented in source; device testing pending |
-| Copy, share, Guide and About | `MainActivity.kt` | Implemented in source; device testing pending |
+| Copy, Guide, About and repository shortcut | `MainActivity.kt` | Implemented in source; device testing pending |
 | Autosave and History (100 sheets) | Local SharedPreferences | Implemented in source; process-death test pending |
 | Themes and five accent palettes | Compose palette mapping | Implemented in source; visual comparison pending |
 | Phone/tablet/landscape adaptation | Compose constraints and scrolling | Implemented in source; visual test matrix pending |
@@ -25,6 +25,10 @@ The current DeepCalc web app is the behavioural reference. The native project is
 - Test cursor replacement, line insertion/deletion, reference shifts, note focus, keyboard switching and long press.
 - Save, close, reopen and edit sheets; verify notes and all History entries survive process death.
 - Test narrow and large phones, tablets, portrait, landscape, split-screen, short-height windows and larger system fonts.
-- Test TalkBack, touch targets, clipboard, share chooser and rotation while editing.
+- Test TalkBack, touch targets, clipboard and rotation while editing.
 
 Do not claim full parity until these checks pass.
+
+- Verify the adaptive icon and its legacy launcher fallbacks on Android 6 through current Android versions.
+- Verify that release R8/resource shrinking preserves calculator, notes, history, themes and clipboard behavior.
+- Compare universal and per-ABI APK sizes; confirm the AAB builds separately with ABI APK splits disabled.
