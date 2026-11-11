@@ -56,7 +56,7 @@ jobs:
             git add -A DeepCalc-Android
             git rm -f DeepCalc-Android-Source.zip
             if ! git diff --cached --quiet; then
-              git commit -m "Update isolated DeepCalc native Android project"
+              git commit -m "Polish final DeepCalc native Android release"
               git push
             fi
           else
@@ -100,23 +100,91 @@ jobs:
             echo "DEEPCALC_KEY_PASSWORD=$ANDROID_KEY_PASSWORD" >> "$GITHUB_ENV"
           fi
 
-      - name: Run unit tests and build APK/AAB
+      - name: Run tests and build APK variants
         working-directory: DeepCalc-Android
         run: |
-          gradle --no-daemon --stacktrace --warning-mode=all \
-            :app:testDebugUnitTest \
-            :app:assembleDebug \
-            :app:assembleRelease \
+          gradle --no-daemon --stacktrace --warning-mode=all \\
+            :app:testDebugUnitTest \\
+            :app:assembleDebug \\
+            :app:assembleRelease
+
+      - name: Build Android App Bundle
+        working-directory: DeepCalc-Android
+        run: |
+          # The AAB contains all ABIs and does not need parallel APK splits.
+          # Build it separately to avoid AGP's multi-APK/resource-shrinker conflict.
+          gradle --no-daemon --stacktrace --warning-mode=all \\
+            -Pdeepcalc.abiSplits=false \\
             :app:bundleRelease
 
       - name: Collect build outputs
+        shell: bash
         run: |
           set -euo pipefail
+          APK_DIR="DeepCalc-Android/app/build/outputs/apk"
+          BUNDLE_DIR="DeepCalc-Android/app/build/outputs/bundle/release"
           mkdir -p output
-          cp DeepCalc-Android/app/build/outputs/apk/debug/*.apk output/DeepCalc-Native-debug.apk
-          cp DeepCalc-Android/app/build/outputs/apk/release/*.apk output/DeepCalc-Native-release.apk
-          cp DeepCalc-Android/app/build/outputs/bundle/release/*.aab output/DeepCalc-Native-release.aab
+
+          find_apk() {
+            local folder="$1"
+            local requested="$2"
+            local variant="$3"
+            local candidate name actual
+            for candidate in "$folder"/app-*-"$variant".apk; do
+              [ -f "$candidate" ] || continue
+              name="$(basename "$candidate")"
+              actual="${name#app-}"
+              actual="${actual%-${variant}.apk}"
+              actual="${actual,,}"
+              actual="${actual//_/-}"
+              if [ "$actual" = "$requested" ]; then
+                printf '%s' "$candidate"
+                return 0
+              fi
+            done
+            echo "Missing ${requested} APK in $folder" >&2
+            find "$folder" -maxdepth 1 -type f -print >&2
+            exit 1
+          }
+
+          cp "$(find_apk "$APK_DIR/debug" "universal" "debug")" output/DeepCalc-Native-debug.apk
+          cp "$(find_apk "$APK_DIR/release" "universal" "release")" output/DeepCalc-Universal.apk
+          for abi in arm64-v8a armeabi-v7a x86 x86_64; do
+            cp "$(find_apk "$APK_DIR/release" "$abi" "release")" "output/DeepCalc-${abi}.apk"
+          done
+          cp "$BUNDLE_DIR/app-release.aab" output/DeepCalc-release.aab
           cp -r DeepCalc-Android/app/build/reports/tests/testDebugUnitTest output/test-reports
+
+          python3 - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+
+          report = [
+              "DeepCalc native release size report",
+              "===================================",
+          ]
+          for apk in sorted(Path("output").glob("*.apk")):
+              with ZipFile(apk) as archive:
+                  dex = sum(
+                      item.file_size for item in archive.infolist()
+                      if item.filename.endswith(".dex")
+                  )
+                  native = sum(
+                      item.file_size for item in archive.infolist()
+                      if item.filename.startswith("lib/")
+                  )
+              report.append(
+                  f"{apk.name}: {apk.stat().st_size / 1024 / 1024:.2f} MB APK | "
+                  f"{dex / 1024 / 1024:.2f} MB DEX uncompressed | "
+                  f"{native / 1024 / 1024:.2f} MB native libraries"
+              )
+
+          Path("output/DeepCalc-APK-Size-Report.txt").write_text(
+              "\n".join(report) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
           {
             echo "## DeepCalc native Android build"
             echo ""
@@ -125,7 +193,11 @@ jobs:
             echo "- Kotlin: 2.4.21"
             echo "- Compile/target SDK: 36 (Android 16)"
             echo "- Unit tests: passed"
-            echo "- Outputs: debug APK, release APK, release AAB"
+            echo "- Release optimisation: R8 + resource shrinking"
+            echo "- ABI outputs: universal, arm64-v8a, armeabi-v7a, x86, x86_64"
+            echo "- Android App Bundle: generated"
+            echo ""
+            cat output/DeepCalc-APK-Size-Report.txt
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload unit-test reports (including failures)
@@ -137,7 +209,7 @@ jobs:
           if-no-files-found: ignore
           retention-days: 30
 
-      - name: Upload APK, AAB and test reports
+      - name: Upload APK, AAB and size report
         uses: actions/upload-artifact@v7
         with:
           name: DeepCalc-Native-Android
