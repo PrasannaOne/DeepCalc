@@ -1,0 +1,30 @@
+# DeepCalc Android port checklist
+
+The current DeepCalc web app is the behavioural reference. The native project is isolated in `DeepCalc-Android/`.
+
+| Area | Native implementation | Status |
+|---|---|---|
+| Multi-line sheet and live results | `MainActivity.kt` + `CalculatorEngine.kt` | Implemented in source; device comparison pending |
+| Expression parser and evaluator | `CalculatorEngine.kt` | Implemented; Gradle tests not yet run |
+| Contextual percentages | `CalculatorEngine.kt` | Test cases authored; execution pending |
+| Powers, roots, unary minus and formatting | `CalculatorEngine.kt` | Test cases authored; execution pending |
+| Variables and line references | `CalculatorEngine.kt` | Test cases authored; execution pending |
+| Comments and empty lines | `CalculatorEngine.kt` | Implemented; comparison pending |
+| Reference shifting | `CalculatorEngine.kt` + line editing | Implemented; comparison pending |
+| Per-line notes and custom keyboard | `MainActivity.kt` | Implemented in source; device comparison pending |
+| Long press, paste, cursor and paired parentheses | `MainActivity.kt` | Implemented in source; device testing pending |
+| Copy, share, Guide and About | `MainActivity.kt` | Implemented in source; device testing pending |
+| Autosave and History (100 sheets) | Local SharedPreferences | Implemented in source; process-death test pending |
+| Themes and five accent palettes | Compose palette mapping | Implemented in source; visual comparison pending |
+| Phone/tablet/landscape adaptation | Compose constraints and scrolling | Implemented in source; visual test matrix pending |
+
+## Required checks before calling it complete
+
+- Run the GitHub Actions build and JUnit test task successfully.
+- Compare the same expression corpus in web and native versions, including result formatting and error strings.
+- Test cursor replacement, line insertion/deletion, reference shifts, note focus, keyboard switching and long press.
+- Save, close, reopen and edit sheets; verify notes and all History entries survive process death.
+- Test narrow and large phones, tablets, portrait, landscape, split-screen, short-height windows and larger system fonts.
+- Test TalkBack, touch targets, clipboard, share chooser and rotation while editing.
+
+Do not claim full parity until these checks pass.
