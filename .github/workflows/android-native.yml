@@ -18,6 +18,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-24.04
+
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -28,34 +29,47 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+
           if [ -f DeepCalc-Android-Source.zip ]; then
             unzip -t DeepCalc-Android-Source.zip
+
             python3 - <<'PY'
           import zipfile
           from pathlib import PurePosixPath
+
           archive = "DeepCalc-Android-Source.zip"
+
           with zipfile.ZipFile(archive) as z:
               names = z.namelist()
+
           if not names:
               raise SystemExit("The source ZIP is empty.")
+
           for name in names:
               path = PurePosixPath(name)
+
               if path.is_absolute() or ".." in path.parts or "\\" in name:
                   raise SystemExit(f"Unsafe ZIP entry: {name}")
+
               if not path.parts or path.parts[0] != "DeepCalc-Android":
                   raise SystemExit(f"Unexpected ZIP root: {name}")
           PY
+
             rm -rf DeepCalc-Android
             unzip -q DeepCalc-Android-Source.zip -d .
+
             test -f DeepCalc-Android/settings.gradle.kts
             test -f DeepCalc-Android/build.gradle.kts
             test -f DeepCalc-Android/app/build.gradle.kts
             test -f DeepCalc-Android/app/src/main/java/com/prasannaone/deepcalc/MainActivity.kt
             test -f DeepCalc-Android/app/src/main/java/com/prasannaone/deepcalc/CalculatorEngine.kt
+
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
             git add -A DeepCalc-Android
             git rm -f DeepCalc-Android-Source.zip
+
             if ! git diff --cached --quiet; then
               git commit -m "Polish final DeepCalc native Android release"
               git push
@@ -93,8 +107,10 @@ jobs:
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           set -euo pipefail
+
           if [ -n "${ANDROID_KEYSTORE_BASE64:-}" ]; then
             echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/deepcalc-release.jks"
+
             echo "DEEPCALC_KEYSTORE_FILE=$RUNNER_TEMP/deepcalc-release.jks" >> "$GITHUB_ENV"
             echo "DEEPCALC_KEYSTORE_PASSWORD=$ANDROID_KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
             echo "DEEPCALC_KEY_ALIAS=$ANDROID_KEY_ALIAS" >> "$GITHUB_ENV"
@@ -112,8 +128,6 @@ jobs:
       - name: Build Android App Bundle
         working-directory: DeepCalc-Android
         run: |
-          # The AAB contains all ABIs and does not need parallel APK splits.
-          # Build it separately to avoid AGP's multi-APK/resource-shrinker conflict.
           gradle --no-daemon --stacktrace --warning-mode=all \
             -Pdeepcalc.abiSplits=false \
             :app:bundleRelease
@@ -122,8 +136,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+
           APK_DIR="DeepCalc-Android/app/build/outputs/apk"
           BUNDLE_DIR="DeepCalc-Android/app/build/outputs/bundle/release"
+
           mkdir -p output
 
           find_apk() {
@@ -131,30 +147,52 @@ jobs:
             local requested="$2"
             local variant="$3"
             local candidate name actual
+
+            # Normalize both names so x86_64 and x86-64 match.
+            requested="${requested//_/-}"
+
             for candidate in "$folder"/app-*-"$variant".apk; do
               [ -f "$candidate" ] || continue
+
               name="$(basename "$candidate")"
               actual="${name#app-}"
               actual="${actual%-${variant}.apk}"
               actual="${actual,,}"
               actual="${actual//_/-}"
+
               if [ "$actual" = "$requested" ]; then
                 printf '%s' "$candidate"
                 return 0
               fi
             done
+
             echo "Missing ${requested} APK in $folder" >&2
-            find "$folder" -maxdepth 1 -type f -print >&2
-            exit 1
+            echo "Available APK files:" >&2
+            find "$folder" -maxdepth 1 -type f -name '*.apk' -print >&2
+
+            return 1
           }
 
-          cp "$(find_apk "$APK_DIR/debug" "universal" "debug")" output/DeepCalc-Native-debug.apk
-          cp "$(find_apk "$APK_DIR/release" "universal" "release")" output/DeepCalc-Universal.apk
+          cp "$(find_apk "$APK_DIR/debug" "universal" "debug")" \
+            output/DeepCalc-Native-debug.apk
+
+          cp "$(find_apk "$APK_DIR/release" "universal" "release")" \
+            output/DeepCalc-Universal.apk
+
           for abi in arm64-v8a armeabi-v7a x86 x86_64; do
-            cp "$(find_apk "$APK_DIR/release" "$abi" "release")" "output/DeepCalc-${abi}.apk"
+            cp "$(find_apk "$APK_DIR/release" "$abi" "release")" \
+              "output/DeepCalc-${abi}.apk"
           done
-          cp "$BUNDLE_DIR/app-release.aab" output/DeepCalc-release.aab
-          cp -r DeepCalc-Android/app/build/reports/tests/testDebugUnitTest output/test-reports
+
+          test -f "$BUNDLE_DIR/app-release.aab"
+
+          cp "$BUNDLE_DIR/app-release.aab" \
+            output/DeepCalc-release.aab
+
+          test -d DeepCalc-Android/app/build/reports/tests/testDebugUnitTest
+
+          cp -r DeepCalc-Android/app/build/reports/tests/testDebugUnitTest \
+            output/test-reports
 
           python3 - <<'PY'
           from pathlib import Path
@@ -164,18 +202,24 @@ jobs:
               "DeepCalc native release size report",
               "===================================",
           ]
+
           for apk in sorted(Path("output").glob("*.apk")):
               with ZipFile(apk) as archive:
                   dex = sum(
-                      item.file_size for item in archive.infolist()
+                      item.file_size
+                      for item in archive.infolist()
                       if item.filename.endswith(".dex")
                   )
+
                   native = sum(
-                      item.file_size for item in archive.infolist()
+                      item.file_size
+                      for item in archive.infolist()
                       if item.filename.startswith("lib/")
                   )
+
               report.append(
-                  f"{apk.name}: {apk.stat().st_size / 1024 / 1024:.2f} MB APK | "
+                  f"{apk.name}: "
+                  f"{apk.stat().st_size / 1024 / 1024:.2f} MB APK | "
                   f"{dex / 1024 / 1024:.2f} MB DEX uncompressed | "
                   f"{native / 1024 / 1024:.2f} MB native libraries"
               )
