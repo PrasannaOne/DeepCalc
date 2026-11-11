@@ -2,7 +2,8 @@
     <application
         android:allowBackup="false"
         android:label="DeepCalc"
-        android:icon="@drawable/ic_deepcalc"
+        android:icon="@drawable/deepcalc_icon"
+        android:roundIcon="@drawable/deepcalc_icon"
         android:theme="@android:style/Theme.Material.Light.NoActionBar"
         android:usesCleartextTraffic="false">
         <activity

@@ -7,9 +7,9 @@ A standalone native Android edition of DeepCalc built with Kotlin and Jetpack Co
 - Multiline notepad calculator with live per-line results.
 - DeepCalc expression syntax: `+`, `−`, `×`, `÷`, `%`, `^`, `sqrt(...)`, variables (`$name`), line references (`$1`) and comments (`#`).
 - Contextual percentages and line-reference shifting when rows are inserted or removed.
-- Per-line notes, custom calculator keyboard, system keyboard toggle, cursor operations and long-press actions.
+- Per-line notes, automatic calculator keyboard for calculation fields, system keyboard for notes, manual keyboard switching, cursor operations and long-press actions.
 - Autosaved active sheet and local History (up to 100 sheets), with open, rename and delete.
-- Copy Sheet, Copy Complete, copy expression/result, share, Guide and About.
+- Copy Sheet, Copy Complete, copy expression/result from the line number or result, GitHub repository shortcut, Guide and About.
 - System, Light, Dark and AMOLED themes with five accent palettes.
 - Adaptive Compose layout with scrollable content and width-aware sizing.
 
@@ -43,4 +43,9 @@ Upload one file named exactly `DeepCalc-Android-Source.zip` to the repository ro
 
 ## Verification status
 
-The previous CI run reached Android dependency metadata checks and failed because Compose 1.12.1 requires compileSdk 37 while the runner installed API 36. This source revision pins the stable Compose 1.11 line and keeps compileSdk/targetSdk at API 36. Calculator-engine tests were corrected to match the actual contextual-percentage evaluation in the source. The next GitHub Actions run must verify dependency resolution, compilation, unit tests, and APK/AAB packaging. This archive has not been represented as a successful Android build; UI parity, device testing, accessibility and process-death testing still require runtime validation on Android devices or emulators.
+The previous CI run reached Android dependency metadata checks and failed because Compose 1.12.1 requires compileSdk 37 while the runner installed API 36. This source revision pins the stable Compose 1.11 line and keeps compileSdk/targetSdk at API 36. Calculator-engine tests were corrected to match the actual contextual-percentage evaluation in the source. The next GitHub Actions run must verify dependency resolution, compilation, unit tests, and APK/AAB packaging. The previous CI run completed the unit tests and generated debug/release APKs and the release AAB. This source revision still requires a fresh CI run. UI parity, device testing, accessibility and process-death testing require runtime validation on Android devices or emulators.
+
+
+## Launcher icon
+
+The native Android launcher icon is generated from the repository-root `icon-512.png` asset during the build. This keeps the Android app icon identical to the existing web app artwork without duplicating or modifying the PWA assets.
