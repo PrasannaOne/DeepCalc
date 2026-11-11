@@ -677,7 +677,7 @@ private fun CalculatorKeyboard(colors: Palette, onTap: (String) -> Unit, onLong:
                         Spacer(Modifier.weight(1f))
                     }
                 }
-                Box(Modifier.align(Alignment.TopEnd).width((maxWidth - gap * 4) / 5).height(cellHeight * 2 + gap)) {
+                Box(Modifier.align(Alignment.TopEnd).width((this@BoxWithConstraints.maxWidth - gap * 4) / 5).height(cellHeight * 2 + gap)) {
                     KeyboardKey("↵", "enter", Modifier.fillMaxSize(), colors, onTap, onLong, enter = true)
                 }
             }

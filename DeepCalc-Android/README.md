@@ -19,13 +19,13 @@ This folder is intended to live at `DeepCalc-Android/` in the existing repositor
 
 ## Build
 
-Requirements: Java 17, Android SDK platform 36, Android Build Tools 36.0.0 and Gradle 8.13.
+Requirements: Java 17, Android SDK platform 36, Android Build Tools 36.0.0 and Gradle 8.14.3.
 
 ```bash
 gradle --no-daemon :app:testDebugUnitTest :app:assembleDebug :app:assembleRelease :app:bundleRelease
 ```
 
-The project uses Android Gradle Plugin 8.13.2, Kotlin 2.3.21 and Jetpack Compose.
+The project uses Android Gradle Plugin 8.13.2, Kotlin 2.3.21 and Jetpack Compose. GitHub Actions installs Gradle 8.14.3 for the build.
 
 ## Signing
 
