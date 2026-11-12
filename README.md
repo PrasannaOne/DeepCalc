@@ -6,8 +6,6 @@
 
 [Open Web App](https://prasannaone.github.io/DeepCalc/) · [Android Releases](https://github.com/PrasannaOne/DeepCalc/releases/latest) · [Source Code](https://github.com/PrasannaOne/DeepCalc)
 
-[![Android build](https://github.com/PrasannaOne/DeepCalc/actions/workflows/android-native.yml/badge.svg)](https://github.com/PrasannaOne/DeepCalc/actions/workflows/android-native.yml)
-
 ![DeepCalc preview](og-image.png)
 
 </div>
