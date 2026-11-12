@@ -65,7 +65,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.first
 import org.json.JSONArray
 import org.json.JSONObject
 import java.text.DateFormat
@@ -182,6 +181,9 @@ private fun DeepCalcApp() {
     val clipboard = LocalClipboardManager.current
     val keyboard = LocalSoftwareKeyboardController.current
     val density = LocalDensity.current
+    // Read the IME inset during composition. It is observable Compose state,
+    // so the keyboard-routing effect can react when the system IME closes.
+    val imeVisible = WindowInsets.ime.getBottom(density) > 0
     val systemDark = androidx.compose.foundation.isSystemInDarkTheme()
     val configuration = LocalConfiguration.current
     val shortScreen = configuration.screenHeightDp <= 700
@@ -359,13 +361,13 @@ private fun DeepCalcApp() {
     // A single routing decision owns both keyboard surfaces. The custom keypad
     // is rendered only for a calculation target in DEEPCALC mode; the Android
     // IME is requested for notes, Android-mode calculations and the save dialog.
-    LaunchedEffect(keyboardRoute) {
+    LaunchedEffect(keyboardRoute, imeVisible) {
         if (keyboardRoute.showCalculatorKeyboard) {
-            keyboard?.hide()
-            if (!calculatorKeyboardVisible) {
-                // Wait for the real IME inset to reach zero; a fixed delay can
-                // race slower keyboards and briefly show both keypads together.
-                snapshotFlow { WindowInsets.ime.getBottom(density) }.first { it == 0 }
+            if (imeVisible) {
+                // Keep the custom keypad hidden until Android reports that its
+                // own keyboard has fully closed.
+                keyboard?.hide()
+            } else if (!calculatorKeyboardVisible) {
                 calculatorKeyboardVisible = true
             }
         } else {
