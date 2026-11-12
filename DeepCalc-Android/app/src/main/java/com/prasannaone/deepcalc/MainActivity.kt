@@ -168,7 +168,6 @@ private fun DeepCalcApp() {
         onSurface = colors.text, onSurfaceVariant = colors.muted, error = colors.error,
         outline = colors.outline)
 
-    fun persist() = LocalStore.save(context, currentLines, notes, focusedLine, savedSheets, themeMode, accentMode)
     fun showToast(message: String) { toast = message; toastVisible = true }
     fun closeDialog() { activeDialog = null }
     fun copyText(value: String, message: String) {
@@ -182,12 +181,10 @@ private fun DeepCalcApp() {
         val nextText = field.text.substring(0, start) + value + field.text.substring(end)
         val cursor = if (moveInsidePair) start + 1 else start + value.length
         lineFields = lineFields.toMutableList().also { it[safe] = TextFieldValue(nextText, androidx.compose.ui.text.TextRange(cursor)) }
-        persist()
     }
     fun clearLine() {
         val safe = focusedLine.coerceIn(0, lineFields.lastIndex)
         lineFields = lineFields.toMutableList().also { it[safe] = TextFieldValue("") }
-        persist()
     }
     fun removeLine(index: Int) {
         if (lineFields.size <= 1) {
@@ -207,7 +204,7 @@ private fun DeepCalcApp() {
             focusedLine = (safeIndex - 1).coerceAtLeast(0).coerceAtMost(lineFields.lastIndex)
         }
         activateCalculation(focusedLine)
-        persist(); focusEpoch++
+        focusEpoch++
     }
     fun insertNewLine(index: Int) {
         val safe = index.coerceIn(0, lineFields.size)
@@ -218,7 +215,7 @@ private fun DeepCalcApp() {
         rowIds = insertStableRowId(rowIds, safe, allocateRowId())
         expandedNotes = expandedNotes.map { if (it >= safe) it + 1 else it }.toSet()
         activateCalculation(safe)
-        persist(); focusEpoch++
+        focusEpoch++
     }
     fun deleteAtCursor() {
         val safe = focusedLine.coerceIn(0, lineFields.lastIndex)
@@ -237,7 +234,6 @@ private fun DeepCalcApp() {
             else -> return
         }
         lineFields = lineFields.toMutableList().also { it[safe] = TextFieldValue(next, androidx.compose.ui.text.TextRange(cursor)) }
-        persist()
     }
     fun sheetCopy(withNotes: Boolean): String {
         val out = mutableListOf<String>()
@@ -256,7 +252,7 @@ private fun DeepCalcApp() {
         val record = SavedSheet("sheet-${System.currentTimeMillis()}-${(100000..999999).random()}", clean,
             System.currentTimeMillis(), currentLines.toList(), currentLines.indices.map { notes.getOrElse(it) { "" } })
         savedSheets = (listOf(record) + savedSheets).take(100)
-        persist(); showToast("Sheet saved to History")
+        showToast("Sheet saved to History")
     }
     fun openSavedSheet(item: SavedSheet) {
         lineFields = (item.lines.ifEmpty { listOf("") }).map { TextFieldValue(it) }
@@ -269,7 +265,7 @@ private fun DeepCalcApp() {
         expandedNotes = emptySet()
         calculationKeyboardMode = CalculationKeyboardMode.DEEPCALC
         activateCalculation(lineFields.lastIndex)
-        persist(); closeDialog(); focusEpoch++; showToast("Opened “${item.title}”")
+        closeDialog(); focusEpoch++; showToast("Opened “${item.title}”")
     }
     fun shareApp() {
         val shareIntent = Intent(Intent.ACTION_SEND).apply {
@@ -320,7 +316,11 @@ private fun DeepCalcApp() {
             keyboard?.show()
         }
     }
-    LaunchedEffect(currentLines, notes, focusedLine, savedSheets, themeMode, accentMode) { persist() }
+    // Persist one complete, current snapshot instead of writing stale intermediate
+    // snapshots from individual input callbacks.
+    LaunchedEffect(currentLines, notes, focusedLine, savedSheets, themeMode, accentMode) {
+        LocalStore.save(context, currentLines, notes, focusedLine, savedSheets, themeMode, accentMode)
+    }
 
     val platformViewConfiguration = LocalViewConfiguration.current
     val deepCalcViewConfiguration = remember(platformViewConfiguration) {
@@ -372,7 +372,6 @@ private fun DeepCalcApp() {
                                 expandedNotes = emptySet()
                                 calculationKeyboardMode = CalculationKeyboardMode.DEEPCALC
                                 activateCalculation(0)
-                                persist()
                                 focusEpoch++
                             }
                             HorizontalDivider(color = colors.variant)
@@ -394,115 +393,116 @@ private fun DeepCalcApp() {
                 lineFields.forEachIndexed { index, fieldValue ->
                     val rowId = rowIds[index]
                     key(rowId) {
-                        if (index in expandedNotes) {
-                            val noteBringIntoViewRequester = remember(rowId) { BringIntoViewRequester() }
-                            Row(Modifier.widthIn(max = 960.dp).fillMaxWidth()
-                                .bringIntoViewRequester(noteBringIntoViewRequester)
-                                .padding(start = if (compactWidth) 28.dp else 40.dp, end = if (compactWidth) 7.dp else 12.dp, bottom = 3.dp)
-                                .padding(bottom = if (activeEditor == ActiveEditor.Note(index)) 16.dp else 0.dp),
-                                verticalAlignment = Alignment.Top) {
-                                Text("⌃", modifier = Modifier.width(22.dp).padding(top = 1.dp), color = colors.primary, fontSize = 12.sp)
-                                Column(Modifier.weight(1f).padding(start = 9.dp).borderStart(colors.noteAccent)) {
-                                    val noteRequester = remember(rowId) { FocusRequester() }
-                                    LaunchedEffect(rowId, activeEditor, expandedNotes, focusEpoch, activeDialog) {
-                                        if (activeEditor == ActiveEditor.Note(index) && index in expandedNotes && activeDialog == null) {
-                                            runCatching { noteRequester.requestFocus() }
+                        val editorBlockRequester = remember(rowId) { BringIntoViewRequester() }
+                        Column(
+                            Modifier.widthIn(max = 960.dp)
+                                .fillMaxWidth()
+                                .bringIntoViewRequester(editorBlockRequester)
+                        ) {
+                            if (index in expandedNotes) {
+                                Row(Modifier.fillMaxWidth()
+                                    .padding(start = if (compactWidth) 28.dp else 40.dp, end = if (compactWidth) 7.dp else 12.dp, bottom = 3.dp)
+                                    .padding(bottom = if (activeEditor == ActiveEditor.Note(index)) 16.dp else 0.dp),
+                                    verticalAlignment = Alignment.Top) {
+                                    Text("⌃", modifier = Modifier.width(22.dp).padding(top = 1.dp), color = colors.primary, fontSize = 12.sp)
+                                    Column(Modifier.weight(1f).padding(start = 9.dp).borderStart(colors.noteAccent)) {
+                                        val noteRequester = remember(rowId) { FocusRequester() }
+                                        LaunchedEffect(rowId, activeEditor, expandedNotes, focusEpoch, activeDialog) {
+                                            if (activeEditor == ActiveEditor.Note(index) && index in expandedNotes && activeDialog == null) {
+                                                runCatching { noteRequester.requestFocus() }
+                                            }
                                         }
+                                        BasicTextField(value = notes.getOrElse(index) { "" }, onValueChange = { value ->
+                                            notes = notes.toMutableList().also { while (it.size <= index) it.add(""); it[index] = value }
+                                        }, modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 21.dp).heightIn(max = 100.dp).focusRequester(noteRequester)
+                                            .onFocusChanged { focusState ->
+                                                if (focusState.isFocused) {
+                                                    activeEditor = ActiveEditor.Note(index)
+                                                }
+                                            },
+                                            textStyle = TextStyle(color = colors.text, fontSize = 12.sp, lineHeight = 19.sp),
+                                            cursorBrush = SolidColor(colors.primary), keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Default),
+                                            decorationBox = { inner -> Box { if (notes.getOrElse(index) { "" }.isEmpty()) Text("For notes…", color = colors.muted.copy(alpha = .55f), fontSize = 12.sp); inner() } })
                                     }
-                                    LaunchedEffect(rowId, activeEditor, imeVisible, notes.getOrElse(index) { "" }) {
-                                        if (activeEditor == ActiveEditor.Note(index) && index in expandedNotes) {
-                                            withFrameNanos { }
-                                            noteBringIntoViewRequester.bringIntoView()
-                                        }
-                                    }
-                                    BasicTextField(value = notes.getOrElse(index) { "" }, onValueChange = { value ->
-                                        notes = notes.toMutableList().also { while (it.size <= index) it.add(""); it[index] = value }; persist()
-                                    }, modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 21.dp).heightIn(max = 100.dp).focusRequester(noteRequester)
-                                        .onFocusChanged { focusState ->
-                                            if (focusState.isFocused) {
-                                                activeEditor = ActiveEditor.Note(index)
+                                }
+                            }
+                            val requester = remember(rowId) { FocusRequester() }
+                            LaunchedEffect(rowId, focusEpoch, activeEditor, activeDialog) {
+                                if (activeDialog == null && activeEditor == ActiveEditor.Calculation(index)) {
+                                    runCatching { requester.requestFocus() }
+                                }
+                            }
+                            // Bring the complete row block into the resized viewport. This
+                            // matters when Notes opens on the final calculation row: keeping
+                            // only the note field visible can hide its line number below the IME.
+                            LaunchedEffect(rowId, activeEditor, imeVisible) {
+                                if (activeEditor == ActiveEditor.Calculation(index) ||
+                                    (activeEditor == ActiveEditor.Note(index) && index in expandedNotes)
+                                ) {
+                                    withFrameNanos { }
+                                    editorBlockRequester.bringIntoView()
+                                }
+                            }
+                            val result = results.getOrNull(index) ?: CalculatorEngine.LineResult(CalculatorEngine.LineResult.Kind.EMPTY, "")
+                            val isComment = fieldValue.text.trimStart().startsWith("#")
+                            Row(Modifier.fillMaxWidth()
+                                .padding(horizontal = if (compactWidth) 6.dp else 12.dp, vertical = 4.dp)
+                                .padding(bottom = if (activeEditor == ActiveEditor.Calculation(index)) 16.dp else 0.dp),
+                                verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier.width(if (compactWidth) 24.dp else 28.dp).height(36.dp)
+                                        .clip(RoundedCornerShape(7.dp))
+                                        .clickable(role = Role.Button) {
+                                            copyText(fieldValue.text, if (fieldValue.text.isBlank()) "Line is empty" else "Copied: ${fieldValue.text.trim()}")
+                                        },
+                                    contentAlignment = Alignment.CenterEnd
+                                ) {
+                                    Text((index + 1).toString(), modifier = Modifier.padding(end = if (compactWidth) 5.dp else 7.dp),
+                                        color = colors.muted.copy(alpha = .72f), textAlign = TextAlign.End, fontSize = 11.sp)
+                                }
+                                Row(Modifier.weight(7f).defaultMinSize(minHeight = 36.dp).clip(RoundedCornerShape(11.dp))
+                                    .background(colors.input).border(1.dp, if (focusedLine == index && !noteFocused) colors.primary.copy(alpha = .52f) else Color.Transparent, RoundedCornerShape(11.dp))
+                                    .padding(start = 11.dp, end = 3.dp, top = 6.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    BasicTextField(value = fieldValue, onValueChange = { next ->
+                                        lineFields = lineFields.toMutableList().also { it[index] = next }; focusedLine = index
+                                    },
+                                        // The value-based BasicTextField cannot opt out of IME-on-focus
+                                        // through KeyboardOptions. Read-only keeps focus/cursor selection
+                                        // but prevents Android's keyboard from flashing in keypad mode.
+                                        readOnly = !keyboardRoute.showSystemKeyboard,
+                                        modifier = Modifier.weight(1f).defaultMinSize(minHeight = 23.dp).focusRequester(requester)
+                                        .onFocusChanged {
+                                            if (it.isFocused) {
+                                                activateCalculation(index)
                                             }
                                         },
-                                        textStyle = TextStyle(color = colors.text, fontSize = 12.sp, lineHeight = 19.sp),
-                                        cursorBrush = SolidColor(colors.primary), keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Default),
-                                        decorationBox = { inner -> Box { if (notes.getOrElse(index) { "" }.isEmpty()) Text("For notes…", color = colors.muted.copy(alpha = .55f), fontSize = 12.sp); inner() } })
-                                }
-                            }
-                        }
-                        val requester = remember(rowId) { FocusRequester() }
-                        val lineBringIntoViewRequester = remember(rowId) { BringIntoViewRequester() }
-                        LaunchedEffect(rowId, focusEpoch, activeEditor, activeDialog) {
-                            if (activeDialog == null && activeEditor == ActiveEditor.Calculation(index)) {
-                                runCatching { requester.requestFocus() }
-                            }
-                        }
-                        LaunchedEffect(rowId, activeEditor, imeVisible, fieldValue.text) {
-                            if (activeEditor == ActiveEditor.Calculation(index)) {
-                                withFrameNanos { }
-                                lineBringIntoViewRequester.bringIntoView()
-                            }
-                        }
-                        val result = results.getOrNull(index) ?: CalculatorEngine.LineResult(CalculatorEngine.LineResult.Kind.EMPTY, "")
-                        val isComment = fieldValue.text.trimStart().startsWith("#")
-                        Row(Modifier.widthIn(max = 960.dp).fillMaxWidth()
-                            .bringIntoViewRequester(lineBringIntoViewRequester)
-                            .padding(horizontal = if (compactWidth) 6.dp else 12.dp, vertical = 4.dp)
-                            .padding(bottom = if (activeEditor == ActiveEditor.Calculation(index)) 16.dp else 0.dp),
-                            verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                modifier = Modifier.width(if (compactWidth) 24.dp else 28.dp).height(36.dp)
-                                    .clip(RoundedCornerShape(7.dp))
-                                    .clickable(role = Role.Button) {
-                                        copyText(fieldValue.text, if (fieldValue.text.isBlank()) "Line is empty" else "Copied: ${fieldValue.text.trim()}")
-                                    },
-                                contentAlignment = Alignment.CenterEnd
-                            ) {
-                                Text((index + 1).toString(), modifier = Modifier.padding(end = if (compactWidth) 5.dp else 7.dp),
-                                    color = colors.muted.copy(alpha = .72f), textAlign = TextAlign.End, fontSize = 11.sp)
-                            }
-                            Row(Modifier.weight(7f).defaultMinSize(minHeight = 36.dp).clip(RoundedCornerShape(11.dp))
-                                .background(colors.input).border(1.dp, if (focusedLine == index && !noteFocused) colors.primary.copy(alpha = .52f) else Color.Transparent, RoundedCornerShape(11.dp))
-                                .padding(start = 11.dp, end = 3.dp, top = 6.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                                BasicTextField(value = fieldValue, onValueChange = { next ->
-                                    lineFields = lineFields.toMutableList().also { it[index] = next }; focusedLine = index; persist()
-                                },
-                                    // The value-based BasicTextField cannot opt out of IME-on-focus
-                                    // through KeyboardOptions. Read-only keeps focus/cursor selection
-                                    // but prevents Android's keyboard from flashing in keypad mode.
-                                    readOnly = !keyboardRoute.showSystemKeyboard,
-                                    modifier = Modifier.weight(1f).defaultMinSize(minHeight = 23.dp).focusRequester(requester)
-                                    .onFocusChanged {
-                                        if (it.isFocused) {
+                                        textStyle = TextStyle(color = if (isComment) colors.muted else colors.text, fontSize = if (compactWidth) 14.sp else 15.sp,
+                                            lineHeight = 23.sp, fontFamily = if (isComment) FontFamily.SansSerif else FontFamily.Monospace),
+                                        cursorBrush = SolidColor(colors.primary), keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None,
+                                            autoCorrectEnabled = false, keyboardType = KeyboardType.Ascii, imeAction = ImeAction.Next),
+                                        keyboardActions = KeyboardActions(onNext = { insertNewLine(index + 1) }),
+                                        decorationBox = { inner -> Box(Modifier.fillMaxWidth().heightIn(min = 23.dp), contentAlignment = Alignment.CenterStart) { inner() } })
+                                    IconButton(onClick = {
+                                        val closingNotes = index in expandedNotes
+                                        expandedNotes = if (closingNotes) expandedNotes - index else expandedNotes + index
+                                        if (closingNotes) {
                                             activateCalculation(index)
+                                            focusEpoch++
+                                        } else {
+                                            activeEditor = ActiveEditor.Note(index)
                                         }
-                                    },
-                                    textStyle = TextStyle(color = if (isComment) colors.muted else colors.text, fontSize = if (compactWidth) 14.sp else 15.sp,
-                                        lineHeight = 23.sp, fontFamily = if (isComment) FontFamily.SansSerif else FontFamily.Monospace),
-                                    cursorBrush = SolidColor(colors.primary), keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None,
-                                        autoCorrectEnabled = false, keyboardType = KeyboardType.Ascii, imeAction = ImeAction.Next),
-                                    keyboardActions = KeyboardActions(onNext = { insertNewLine(index + 1) }),
-                                    decorationBox = { inner -> Box(Modifier.fillMaxWidth().heightIn(min = 23.dp), contentAlignment = Alignment.CenterStart) { inner() } })
-                                IconButton(onClick = {
-                                    val closingNotes = index in expandedNotes
-                                    expandedNotes = if (closingNotes) expandedNotes - index else expandedNotes + index
-                                    if (closingNotes) {
-                                        activateCalculation(index)
-                                        focusEpoch++
-                                    } else {
-                                        activeEditor = ActiveEditor.Note(index)
+                                    }, modifier = Modifier.size(32.dp)) {
+                                        Text(if (index in expandedNotes) "⌄" else "⌃", color = if (index in expandedNotes) colors.primary else colors.muted.copy(alpha = .65f), fontSize = 12.sp)
                                     }
-                                    persist()
-                                }, modifier = Modifier.size(32.dp)) {
-                                    Text(if (index in expandedNotes) "⌄" else "⌃", color = if (index in expandedNotes) colors.primary else colors.muted.copy(alpha = .65f), fontSize = 12.sp)
                                 }
-                            }
-                            Box(Modifier.weight(3f).padding(start = 3.dp).defaultMinSize(minHeight = 36.dp)
-                                .clip(RoundedCornerShape(11.dp)).background(colors.primaryContainer.copy(alpha = .48f)).padding(horizontal = 7.dp, vertical = 6.dp),
-                                contentAlignment = Alignment.TopEnd) {
-                                Text(result.text, modifier = Modifier.clickable(enabled = result.kind == CalculatorEngine.LineResult.Kind.SUCCESS) { copyText(result.text, "Copied: ${result.text}") },
-                                    color = when (result.kind) { CalculatorEngine.LineResult.Kind.ERROR -> colors.error; CalculatorEngine.LineResult.Kind.EMPTY -> colors.muted; else -> colors.primaryStrong },
-                                    textAlign = TextAlign.End, fontFamily = FontFamily.Monospace, fontSize = if (compactWidth) 13.sp else 14.sp, lineHeight = 22.sp,
-                                    fontWeight = if (result.kind == CalculatorEngine.LineResult.Kind.SUCCESS) FontWeight.SemiBold else FontWeight.Normal)
+                                Box(Modifier.weight(3f).padding(start = 3.dp).defaultMinSize(minHeight = 36.dp)
+                                    .clip(RoundedCornerShape(11.dp)).background(colors.primaryContainer.copy(alpha = .48f)).padding(horizontal = 7.dp, vertical = 6.dp),
+                                    contentAlignment = Alignment.TopEnd) {
+                                    Text(result.text, modifier = Modifier.clickable(enabled = result.kind == CalculatorEngine.LineResult.Kind.SUCCESS) { copyText(result.text, "Copied: ${result.text}") },
+                                        color = when (result.kind) { CalculatorEngine.LineResult.Kind.ERROR -> colors.error; CalculatorEngine.LineResult.Kind.EMPTY -> colors.muted; else -> colors.primaryStrong },
+                                        textAlign = TextAlign.End, fontFamily = FontFamily.Monospace, fontSize = if (compactWidth) 13.sp else 14.sp, lineHeight = 22.sp,
+                                        fontWeight = if (result.kind == CalculatorEngine.LineResult.Kind.SUCCESS) FontWeight.SemiBold else FontWeight.Normal)
+                                }
                             }
                         }
                     }
@@ -529,8 +529,8 @@ private fun DeepCalcApp() {
                         "enter" -> insertNewLine(focusedLine + 1)
                         "backspace" -> deleteAtCursor()
                         "power" -> insertAtCursor("^")
-                        "hash" -> { insertAtCursor("#"); calculationKeyboardMode = CalculationKeyboardMode.ANDROID; persist() }
-                        "dollar" -> { insertAtCursor("$"); calculationKeyboardMode = CalculationKeyboardMode.ANDROID; persist() }
+                        "hash" -> { insertAtCursor("#"); calculationKeyboardMode = CalculationKeyboardMode.ANDROID }
+                        "dollar" -> { insertAtCursor("$"); calculationKeyboardMode = CalculationKeyboardMode.ANDROID }
                         "paste" -> {
                             val clip = clipboard.getText()?.text
                             if (!clip.isNullOrEmpty()) insertAtCursor(clip) else showToast("Clipboard is empty")
@@ -565,7 +565,7 @@ private fun DeepCalcApp() {
                     if (cleanTitle.isNotEmpty()) {
                         if (editingId == null) saveCurrentSheet(cleanTitle) else {
                             savedSheets = savedSheets.map { if (it.id == editingId) it.copy(title = cleanTitle) else it }
-                            persist(); showToast("Sheet renamed")
+                            showToast("Sheet renamed")
                         }
                         renameId = null
                         activeDialog = if (editingId == null) null else "history"
@@ -619,7 +619,7 @@ private fun DeepCalcApp() {
                             Box(Modifier.weight(1f).defaultMinSize(minHeight = 35.dp).clip(RoundedCornerShape(10.dp))
                                 .background(if (themeMode == value) colors.raised else Color.Transparent)
                                 .border(1.dp, if (themeMode == value) colors.primary.copy(alpha = .35f) else Color.Transparent, RoundedCornerShape(10.dp))
-                                .clickable { themeMode = value; persist() }.padding(horizontal = 2.dp), contentAlignment = Alignment.Center) {
+                                .clickable { themeMode = value }.padding(horizontal = 2.dp), contentAlignment = Alignment.Center) {
                                 Text(label, color = if (themeMode == value) colors.primary else colors.muted,
                                     fontSize = if (compactWidth) 10.sp else 12.sp, fontWeight = if (themeMode == value) FontWeight.Bold else FontWeight.Normal)
                             }
@@ -632,7 +632,7 @@ private fun DeepCalcApp() {
                         paletteNames.forEach { (value, label) ->
                             Column(Modifier.weight(1f).clip(RoundedCornerShape(11.dp))
                                 .background(if (accentMode == value) colors.primary.copy(alpha = .08f) else Color.Transparent)
-                                .clickable { accentMode = value; persist() }.padding(vertical = 5.dp, horizontal = 1.dp),
+                                .clickable { accentMode = value }.padding(vertical = 5.dp, horizontal = 1.dp),
                                 horizontalAlignment = Alignment.CenterHorizontally) {
                                 Box(Modifier.size(26.dp).border(2.dp, if (accentMode == value) colors.primary else colors.outline.copy(alpha = .14f), CircleShape)
                                     .padding(2.dp).clip(CircleShape).background(palette(themeMode, value, systemDark).primary), contentAlignment = Alignment.Center) {
@@ -682,7 +682,7 @@ private fun DeepCalcApp() {
             AlertDialog(onDismissRequest = { pendingDelete = null }, containerColor = colors.raised,
                 title = { Text("Delete saved sheet?", color = colors.text) },
                 text = { Text("Delete “${item.title}” from History?", color = colors.text) },
-                confirmButton = { TextButton(onClick = { savedSheets = savedSheets.filterNot { it.id == item.id }; pendingDelete = null; persist(); showToast("Sheet deleted") }) { Text("Delete", color = colors.error) } },
+                confirmButton = { TextButton(onClick = { savedSheets = savedSheets.filterNot { it.id == item.id }; pendingDelete = null; showToast("Sheet deleted") }) { Text("Delete", color = colors.error) } },
                 dismissButton = { TextButton(onClick = { pendingDelete = null }) { Text("Cancel", color = colors.primary) } })
         }
       }

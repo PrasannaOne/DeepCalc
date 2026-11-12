@@ -67,3 +67,34 @@ Before submitting, publish the final source commit and create the matching `v2.1
 ## Credits and licence
 
 DeepCalc's Android edition is made by PrasannaOne. It builds on the original SoulCalc project by Albert “Tigr” Zenkoff. The MIT licence and original attribution are retained; see `LICENSE`.
+
+## Maintaining the source
+
+The Android project is intentionally split by responsibility. Keep changes in the
+smallest relevant file and preserve the existing boundaries:
+
+- **Expression behaviour:** `CalculatorEngine.kt` contains the tokenizer, parser,
+  evaluator and line-reference shifting. Add or update engine tests whenever its
+  behaviour changes. Do not replace it with platform evaluation or a third-party parser
+  without a deliberate compatibility review.
+- **Keyboard behaviour:** `KeyboardRouting.kt` is the single source of truth for which
+  keyboard is allowed to appear. Keep routing decisions independent of Compose UI so
+  they remain easy to test.
+- **Editor rows:** `MainActivity.kt` owns screen state and editor composition.
+  Calculation rows use stable row IDs; do not use their changing list index as a
+  Compose identity or as a `remember` key.
+- **Persistence:** `LocalStore.kt` owns the SharedPreferences schema. The existing
+  preference names are part of the installed app's local data format. Rename or remove
+  one only with an explicit migration. The UI writes one complete snapshot after state
+  changes; avoid adding extra saves inside individual input callbacks.
+- **Visual styling:** `Palette.kt` owns theme and accent colours, while
+  `CalculatorComponents.kt` contains reusable menu, history, guide and keypad pieces.
+
+Use the Kotlin conventions in `.editorconfig`. Keep the manifest free of the Internet
+permission unless a reviewed feature genuinely requires network access. Never commit
+keystore files, signing passwords or local SDK configuration.
+
+Before publishing, run the Gradle test/build tasks in the Build section and work through
+`INTERACTION-REGRESSION-CHECKLIST.md` on a real Android device. CI can verify compilation
+and unit tests, but cannot certify keyboard animation, focus or viewport behaviour on a
+specific phone.

@@ -20,7 +20,8 @@ This checklist is for the final Android device pass. Unit tests cover the pure k
 - [ ] Notes never show the DeepCalc keypad.
 - [ ] The active calculation row remains visible above the keypad after adding a line.
 - [ ] The active Notes field remains visible above the Android keyboard while typing and while its content grows.
-- [ ] The final row/note can be brought fully into view with breathing room above the keyboard.
+- [ ] Opening Notes on the final calculation row keeps the line number, expression and note field visible together above the Android keyboard.
+- [ ] Closing that note returns focus to the same calculation row without an unnecessary jump or manual scroll.
 
 ## Row insertion and deletion
 

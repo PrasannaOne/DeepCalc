@@ -6,7 +6,7 @@ import org.json.JSONObject
 
 internal data class SavedSheet(
     val id: String,
-    var title: String,
+    val title: String,
     val createdAt: Long,
     val lines: List<String>,
     val notes: List<String>
@@ -24,17 +24,24 @@ internal data class AppSnapshot(
 /** Device-local persistence for the active sheet, preferences and History. */
 internal object LocalStore {
     private const val PREFS = "deepcalc-native-v1"
+    private const val KEY_ACTIVE_LINES = "active_lines"
+    private const val KEY_ACTIVE_NOTES = "active_notes"
+    private const val KEY_FOCUS = "focus"
+    private const val KEY_HISTORY = "history"
+    private const val KEY_THEME = "theme"
+    private const val KEY_ACCENT = "accent"
+    private const val LEGACY_CUSTOM_KEYBOARD = "custom_keyboard"
 
     fun load(context: Context): AppSnapshot {
         val preferences = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val storedLines = runCatching {
-            JSONArray(preferences.getString("active_lines", "[\"\"]") ?: "[\"\"]")
+            JSONArray(preferences.getString(KEY_ACTIVE_LINES, "[\"\"]") ?: "[\"\"]")
                 .toStrings()
         }.getOrDefault(listOf(""))
             .ifEmpty { listOf("") }
 
         val storedNotes = runCatching {
-            JSONArray(preferences.getString("active_notes", "[]") ?: "[]").toStrings()
+            JSONArray(preferences.getString(KEY_ACTIVE_NOTES, "[]") ?: "[]").toStrings()
         }.getOrDefault(emptyList())
 
         // Always keep a trailing empty editor row so the sheet is ready for input.
@@ -42,7 +49,7 @@ internal object LocalStore {
             if (last().trim().isNotEmpty()) add("")
         }
         val notes = lines.indices.map { storedNotes.getOrElse(it) { "" } }
-        val storedFocus = preferences.getInt("focus", 0)
+        val storedFocus = preferences.getInt(KEY_FOCUS, 0)
         val focus = if (storedFocus >= storedLines.lastIndex) {
             lines.lastIndex
         } else {
@@ -50,7 +57,7 @@ internal object LocalStore {
         }
 
         val history = runCatching {
-            val array = JSONArray(preferences.getString("history", "[]") ?: "[]")
+            val array = JSONArray(preferences.getString(KEY_HISTORY, "[]") ?: "[]")
             (0 until array.length()).mapNotNull { index ->
                 val item = array.optJSONObject(index) ?: return@mapNotNull null
                 val itemLines = item.optJSONArray("lines")?.toStrings()
@@ -70,8 +77,8 @@ internal object LocalStore {
             notes = notes,
             focus = focus,
             savedSheets = history,
-            theme = preferences.getString("theme", "system") ?: "system",
-            accent = preferences.getString("accent", "purple") ?: "purple"
+            theme = preferences.getString(KEY_THEME, "system") ?: "system",
+            accent = preferences.getString(KEY_ACCENT, "purple") ?: "purple"
         )
     }
 
@@ -104,13 +111,14 @@ internal object LocalStore {
 
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .edit()
-            .putString("active_lines", activeLines)
-            .putString("active_notes", activeNotes)
-            .putInt("focus", focus)
-            .putString("history", records)
-            .putString("theme", theme)
-            .putString("accent", accent)
-            .remove("custom_keyboard")
+            .putString(KEY_ACTIVE_LINES, activeLines)
+            .putString(KEY_ACTIVE_NOTES, activeNotes)
+            .putInt(KEY_FOCUS, focus)
+            .putString(KEY_HISTORY, records)
+            .putString(KEY_THEME, theme)
+            .putString(KEY_ACCENT, accent)
+            // Clear the retired preference key during the next successful save.
+            .remove(LEGACY_CUSTOM_KEYBOARD)
             .apply()
     }
 
