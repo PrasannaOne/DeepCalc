@@ -1,12 +1,13 @@
-
 name: DeepCalc Native Android
 
 on:
   workflow_dispatch:
   push:
+    branches: [main]
     paths:
       - 'DeepCalc-Android-Source.zip'
       - 'DeepCalc-Android/**'
+      - '.github/workflows/android-native.yml'
 
 permissions:
   contents: write
@@ -18,88 +19,72 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-24.04
-
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v7
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
       - name: Install native project folder from uploaded ZIP
+        if: github.ref_type == 'branch'
         shell: bash
         run: |
           set -euo pipefail
-
           if [ -f DeepCalc-Android-Source.zip ]; then
             unzip -t DeepCalc-Android-Source.zip
-
             python3 - <<'PY'
           import zipfile
           from pathlib import PurePosixPath
-
-          archive = "DeepCalc-Android-Source.zip"
-
-          with zipfile.ZipFile(archive) as z:
+          with zipfile.ZipFile("DeepCalc-Android-Source.zip") as z:
               names = z.namelist()
-
           if not names:
-              raise SystemExit("The source ZIP is empty.")
-
+              raise SystemExit("Empty source ZIP")
           for name in names:
-              path = PurePosixPath(name)
-
-              if path.is_absolute() or ".." in path.parts or "\\" in name:
+              p = PurePosixPath(name)
+              if p.is_absolute() or ".." in p.parts or "\\" in name:
                   raise SystemExit(f"Unsafe ZIP entry: {name}")
-
-              if not path.parts or path.parts[0] != "DeepCalc-Android":
+              if not p.parts or p.parts[0] != "DeepCalc-Android":
                   raise SystemExit(f"Unexpected ZIP root: {name}")
           PY
-
             rm -rf DeepCalc-Android
             unzip -q DeepCalc-Android-Source.zip -d .
-
             test -f DeepCalc-Android/settings.gradle.kts
-            test -f DeepCalc-Android/build.gradle.kts
             test -f DeepCalc-Android/app/build.gradle.kts
-            test -f DeepCalc-Android/app/src/main/java/com/prasannaone/deepcalc/MainActivity.kt
-            test -f DeepCalc-Android/app/src/main/java/com/prasannaone/deepcalc/CalculatorEngine.kt
-
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
             git add -A DeepCalc-Android
             git rm -f DeepCalc-Android-Source.zip
-
             if ! git diff --cached --quiet; then
-              git commit -m "Polish final DeepCalc native Android release"
+              git commit -m "Update DeepCalc native Android source"
               git push
             fi
           else
             test -f DeepCalc-Android/settings.gradle.kts
-            test -f DeepCalc-Android/build.gradle.kts
             test -f DeepCalc-Android/app/build.gradle.kts
           fi
 
-      - name: Set up Java
-        uses: actions/setup-java@v6
+      - name: Verify release tag matches app version
+        if: github.ref == 'refs/heads/main'
+        run: |
+          APP_VERSION="$(grep -oP 'versionName = "\K[^" ]+' DeepCalc-Android/app/build.gradle.kts | head -n1)"
+          test "$GITHUB_REF_NAME" = "v$APP_VERSION"
+
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '21'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v4
+      - uses: android-actions/setup-android@v4
         with:
           packages: platform-tools
 
-      - name: Install stable Android 16 SDK and Build Tools
+      - name: Install Android SDK and Build Tools
         run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
 
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v6
+      - uses: gradle/actions/setup-gradle@v6
         with:
           gradle-version: '9.7.0'
 
-      - name: Decode release signing key (when configured)
+      - name: Load release signing key
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
@@ -107,157 +92,141 @@ jobs:
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           set -euo pipefail
-
           if [ -n "${ANDROID_KEYSTORE_BASE64:-}" ]; then
             echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/deepcalc-release.jks"
-
             echo "DEEPCALC_KEYSTORE_FILE=$RUNNER_TEMP/deepcalc-release.jks" >> "$GITHUB_ENV"
             echo "DEEPCALC_KEYSTORE_PASSWORD=$ANDROID_KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
             echo "DEEPCALC_KEY_ALIAS=$ANDROID_KEY_ALIAS" >> "$GITHUB_ENV"
             echo "DEEPCALC_KEY_PASSWORD=$ANDROID_KEY_PASSWORD" >> "$GITHUB_ENV"
+          else
+            echo "Release signing key missing; refusing to build a publishable release." >&2
+            exit 1
           fi
 
       - name: Run tests and build APK variants
         working-directory: DeepCalc-Android
         run: |
-          gradle --no-daemon --stacktrace --warning-mode=all \
-            :app:testDebugUnitTest \
-            :app:assembleDebug \
-            :app:assembleRelease
+          gradle --no-daemon --stacktrace --warning-mode=all :app:testDebugUnitTest :app:assembleDebug :app:assembleRelease
 
       - name: Build Android App Bundle
         working-directory: DeepCalc-Android
         run: |
-          gradle --no-daemon --stacktrace --warning-mode=all \
-            -Pdeepcalc.abiSplits=false \
-            :app:bundleRelease
+          gradle --no-daemon --stacktrace --warning-mode=all -Pdeepcalc.abiSplits=false :app:bundleRelease
 
-      - name: Collect build outputs
+      - name: Collect release assets and internal reports
         shell: bash
         run: |
           set -euo pipefail
-
           APK_DIR="DeepCalc-Android/app/build/outputs/apk"
           BUNDLE_DIR="DeepCalc-Android/app/build/outputs/bundle/release"
-
-          mkdir -p output
-
+          mkdir -p release-assets internal-reports
           find_apk() {
-            local folder="$1"
-            local requested="$2"
-            local variant="$3"
-            local candidate name actual
-
-            # Normalize both names so x86_64 and x86-64 match.
+            local folder="$1" requested="$2" variant="$3" candidate name actual
             requested="${requested//_/-}"
-
             for candidate in "$folder"/app-*-"$variant".apk; do
               [ -f "$candidate" ] || continue
-
               name="$(basename "$candidate")"
               actual="${name#app-}"
               actual="${actual%-${variant}.apk}"
               actual="${actual,,}"
               actual="${actual//_/-}"
-
-              if [ "$actual" = "$requested" ]; then
-                printf '%s' "$candidate"
-                return 0
-              fi
+              if [ "$actual" = "$requested" ]; then printf '%s' "$candidate"; return 0; fi
             done
-
-            echo "Missing ${requested} APK in $folder" >&2
-            echo "Available APK files:" >&2
-            find "$folder" -maxdepth 1 -type f -name '*.apk' -print >&2
-
-            return 1
+            echo "Missing $requested APK" >&2; return 1
           }
-
-          cp "$(find_apk "$APK_DIR/debug" "universal" "debug")" \
-            output/DeepCalc-Native-debug.apk
-
-          cp "$(find_apk "$APK_DIR/release" "universal" "release")" \
-            output/DeepCalc-Universal.apk
-
+          cp "$(find_apk "$APK_DIR/release" universal release)" release-assets/DeepCalc-Universal.apk
           for abi in arm64-v8a armeabi-v7a x86 x86_64; do
-            cp "$(find_apk "$APK_DIR/release" "$abi" "release")" \
-              "output/DeepCalc-${abi}.apk"
+            cp "$(find_apk "$APK_DIR/release" "$abi" release)" "release-assets/DeepCalc-$abi.apk"
           done
-
-          test -f "$BUNDLE_DIR/app-release.aab"
-
-          cp "$BUNDLE_DIR/app-release.aab" \
-            output/DeepCalc-release.aab
-
-          test -d DeepCalc-Android/app/build/reports/tests/testDebugUnitTest
-
-          cp -r DeepCalc-Android/app/build/reports/tests/testDebugUnitTest \
-            output/test-reports
-
+          cp "$BUNDLE_DIR/app-release.aab" release-assets/DeepCalc-release.aab
+          if [ -d DeepCalc-Android/app/build/reports/tests/testDebugUnitTest ]; then
+            cp -r DeepCalc-Android/app/build/reports/tests/testDebugUnitTest internal-reports/test-reports
+          fi
           python3 - <<'PY'
           from pathlib import Path
           from zipfile import ZipFile
-
-          report = [
-              "DeepCalc native release size report",
-              "===================================",
-          ]
-
-          for apk in sorted(Path("output").glob("*.apk")):
-              with ZipFile(apk) as archive:
-                  dex = sum(
-                      item.file_size
-                      for item in archive.infolist()
-                      if item.filename.endswith(".dex")
-                  )
-
-                  native = sum(
-                      item.file_size
-                      for item in archive.infolist()
-                      if item.filename.startswith("lib/")
-                  )
-
-              report.append(
-                  f"{apk.name}: "
-                  f"{apk.stat().st_size / 1024 / 1024:.2f} MB APK | "
-                  f"{dex / 1024 / 1024:.2f} MB DEX uncompressed | "
-                  f"{native / 1024 / 1024:.2f} MB native libraries"
-              )
-
-          Path("output/DeepCalc-APK-Size-Report.txt").write_text(
-              "\n".join(report) + "\n",
-              encoding="utf-8",
-          )
+          import hashlib
+          report = ["DeepCalc native release size report", "==================================="]
+          for apk in sorted(Path("release-assets").glob("*.apk")):
+              with ZipFile(apk) as z:
+                  dex = sum(x.file_size for x in z.infolist() if x.filename.endswith(".dex"))
+                  libs = sum(x.file_size for x in z.infolist() if x.filename.startswith("lib/"))
+              report.append(f"{apk.name}: {apk.stat().st_size/1048576:.2f} MB APK | {dex/1048576:.2f} MB DEX | {libs/1048576:.2f} MB native")
+          Path("internal-reports/DeepCalc-APK-Size-Report.txt").write_text("\n".join(report)+"\n")
+          sums = [f"{hashlib.sha256(p.read_bytes()).hexdigest()}  {p.name}" for p in sorted(Path("release-assets").iterdir()) if p.is_file()]
+          Path("release-assets/SHA256SUMS.txt").write_text("\n".join(sums)+"\n")
           PY
+          { echo "## DeepCalc Android build"; echo "- Unit tests: passed"; cat internal-reports/DeepCalc-APK-Size-Report.txt; } >> "$GITHUB_STEP_SUMMARY"
 
-          {
-            echo "## DeepCalc native Android build"
-            echo ""
-            echo "- Gradle: 9.7.0"
-            echo "- Android Gradle Plugin: 9.3.0"
-            echo "- Kotlin: 2.4.21"
-            echo "- Compile/target SDK: 36 (Android 16)"
-            echo "- Unit tests: passed"
-            echo "- Release optimisation: R8 + resource shrinking"
-            echo "- ABI outputs: universal, arm64-v8a, armeabi-v7a, x86, x86_64"
-            echo "- Android App Bundle: generated"
-            echo ""
-            cat output/DeepCalc-APK-Size-Report.txt
-          } >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Upload unit-test reports (including failures)
+      - name: Upload internal test reports
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: DeepCalc-Unit-Test-Reports
-          path: DeepCalc-Android/app/build/reports/tests/testDebugUnitTest
+          name: DeepCalc-Internal-Test-Reports
+          path: internal-reports/test-reports
           if-no-files-found: ignore
           retention-days: 30
 
-      - name: Upload APK, AAB and size report
+      - name: Upload clean release assets
         uses: actions/upload-artifact@v7
         with:
-          name: DeepCalc-Native-Android
-          path: output/**
+          name: DeepCalc-Release-Assets
+          path: release-assets/*
+          if-no-files-found: error
           retention-days: 30
-          
+
+      - name: Upload internal size report
+        uses: actions/upload-artifact@v7
+        with:
+          name: DeepCalc-Internal-Build-Report
+          path: internal-reports/DeepCalc-APK-Size-Report.txt
+          if-no-files-found: error
+          retention-days: 30
+
+  publish:
+    if: github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out source for version metadata
+        uses: actions/checkout@v7
+
+      - name: Determine release version and skip existing releases
+        id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="$(sed -n 's/^[[:space:]]*versionName = \"\([^\"]*\)\".*/\1/p' DeepCalc-Android/app/build.gradle.kts | head -n1)"
+          test -n "$VERSION"
+          TAG="v$VERSION"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists. Bump versionName to publish a new release."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/download-artifact@v7
+        if: steps.version.outputs.skip != 'true'
+        with:
+          name: DeepCalc-Release-Assets
+          path: release-assets
+
+      - name: Publish GitHub Release
+        if: steps.version.outputs.skip != 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          name: DeepCalc ${{ steps.version.outputs.tag }}
+          tag_name: ${{ steps.version.outputs.tag }}
+          target_commitish: main
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: |
+            release-assets/DeepCalc-Universal.apk
+            release-assets/DeepCalc-arm64-v8a.apk
+            release-assets/DeepCalc-armeabi-v7a.apk
+            release-assets/DeepCalc-x86.apk
+            release-assets/DeepCalc-x86_64.apk
+            release-assets/DeepCalc-release.aab
+            release-assets/SHA256SUMS.txt
