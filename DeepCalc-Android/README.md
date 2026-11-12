@@ -62,7 +62,7 @@ The repository-level GitHub Actions workflow runs unit tests, debug/release APK 
 
 The project uses the MIT licence and its runtime manifest requests no network permission. Fastlane listing text and icon assets are included in `fastlane/metadata/android/en-US/`. A draft F-Droid metadata file is included under `fdroid/` for maintainers to copy into the `fdroiddata` repository.
 
-Before submitting, publish the final source commit and create the matching `v2.1.1` Git tag. Then replace the tag reference in the F-Droid metadata draft with the exact release tag/commit. F-Droid's maintainers still need to review the project and verify that their build environment supports the project's Android Gradle Plugin and Gradle versions; inclusion is not automatic.
+Before submitting, publish the final source commit and create the matching `v2.1.2` Git tag. Then replace the tag reference in the F-Droid metadata draft with the exact release tag/commit. F-Droid's maintainers still need to review the project and verify that their build environment supports the project's Android Gradle Plugin and Gradle versions; inclusion is not automatic.
 
 ## Credits and licence
 

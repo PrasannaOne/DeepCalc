@@ -1,0 +1,1 @@
+Build-only release for official F-Droid submission preparation. No calculator features or interface changes.

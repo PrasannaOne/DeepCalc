@@ -1,5 +1,5 @@
 # Copy this file to fdroiddata/metadata/com.prasannaone.deepcalc.yml
-# only after the upstream v2.1.1 tag exists and points to the final source commit.
+# only after the upstream v2.1.2 tag exists and points to the final source commit.
 Categories:
   - Science & Education
 License: MIT
@@ -29,8 +29,8 @@ MaintainerNotes: |
 RepoType: git
 Repo: https://github.com/PrasannaOne/DeepCalc
 Builds:
-  - versionName: 2.1.1
-    versionCode: 5
+  - versionName: 2.1.2
+    versionCode: 6
     commit: REPLACE_WITH_FINAL_40_CHARACTER_COMMIT_SHA
     subdir: DeepCalc-Android
     gradle:
@@ -38,6 +38,6 @@ Builds:
     gradleprops:
       - deepcalc.abiSplits=false
 UpdateCheckMode: Tags
-CurrentVersion: 2.1.1
-CurrentVersionCode: 5
+CurrentVersion: 2.1.2
+CurrentVersionCode: 6
 AutoUpdateMode: Version
