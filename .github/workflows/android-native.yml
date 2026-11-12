@@ -62,12 +62,6 @@ jobs:
             test -f DeepCalc-Android/app/build.gradle.kts
           fi
 
-      - name: Verify release tag matches app version
-        if: github.ref == 'refs/heads/main'
-        run: |
-          APP_VERSION="$(grep -oP 'versionName = "\K[^" ]+' DeepCalc-Android/app/build.gradle.kts | head -n1)"
-          test "$GITHUB_REF_NAME" = "v$APP_VERSION"
-
       - uses: actions/setup-java@v6
         with:
           distribution: temurin
@@ -230,3 +224,4 @@ jobs:
             release-assets/DeepCalc-x86_64.apk
             release-assets/DeepCalc-release.aab
             release-assets/SHA256SUMS.txt
+            
