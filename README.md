@@ -1,150 +1,66 @@
-<p align="center">
-  <a href="https://prasannaone.github.io/DeepCalc/">
-    <img src="https://img.shields.io/badge/OPEN%20DEEPCALC-LIVE%20APP-7650c8?style=for-the-badge" alt="Open DeepCalc">
-  </a>
-  <a href="https://github.com/PrasannaOne/DeepCalc/releases/latest">
-    <img src="https://img.shields.io/github/v/release/PrasannaOne/DeepCalc?display_name=tag&style=for-the-badge" alt="Latest release">
-  </a>
-  <a href="https://github.com/PrasannaOne/DeepCalc/actions/workflows/android-native.yml">
-    <img src="https://github.com/PrasannaOne/DeepCalc/actions/workflows/android-native.yml/badge.svg" alt="Android build">
-  </a>
-</p>
+<div align="center">
 
-<h1 align="center"><a href="https://prasannaone.github.io/DeepCalc/">DeepCalc ↗</a></h1>
-<p align="center"><strong>Write it. Work it out. See it unfold.</strong></p>
-<p align="center">
-  <a href="https://github.com/PrasannaOne/DeepCalc">Source</a> ·
-  <a href="LICENSE">MIT License</a> ·
-  <a href="https://github.com/tigrino/soulcalc">Based on SoulCalc</a> ·
-  <a href="https://github.com/PrasannaOne/DeepCalc/releases">Releases</a>
-</p>
+# DeepCalc
 
-<p align="center">
-  <a href="https://prasannaone.github.io/DeepCalc/"><img src="og-image.png" alt="DeepCalc app preview" width="100%"></a>
-</p>
+**Write it. Work it out. See it unfold.**
 
-**DeepCalc is a notepad-style calculator** for working through connected calculations. Write expressions line by line, reuse variables and previous results, add notes, and see results update as you edit.
+[Open Web App](https://prasannaone.github.io/DeepCalc/) · [Android Releases](https://github.com/PrasannaOne/DeepCalc/releases/latest) · [Source Code](https://github.com/PrasannaOne/DeepCalc)
 
-The project includes two separate editions:
+[![Android build](https://github.com/PrasannaOne/DeepCalc/actions/workflows/android-native.yml/badge.svg)](https://github.com/PrasannaOne/DeepCalc/actions/workflows/android-native.yml)
 
-- **Web / PWA:** the browser-based calculator published through GitHub Pages.
-- **Android:** a standalone app built with Kotlin and Jetpack Compose, with its own expression engine and native interface.
+![DeepCalc preview](og-image.png)
 
-## Get DeepCalc
+</div>
 
-- 🌐 **[Open the web app](https://prasannaone.github.io/DeepCalc/)**
-- 📱 **[Download the latest Android release](https://github.com/PrasannaOne/DeepCalc/releases/latest)**
+DeepCalc is a notepad-style calculator for working through calculations line by line. Write expressions, reuse variables and earlier results, add notes, and keep your work organised.
 
-### Android release downloads
+**This repository contains two distinct applications:**
 
-Open the latest GitHub Release and expand **Assets**.
+1. **DeepCalc Web**, a browser-based application that can be installed as a Progressive Web App (PWA).
+2. **DeepCalc for Android**, a separate native Android application built with Kotlin and Jetpack Compose.
 
-| File | What it is |
-|---|---|
-| `DeepCalc-Universal.apk` | Recommended APK for most Android devices |
-| `DeepCalc-arm64-v8a.apk` | APK for 64-bit ARM devices |
-| `DeepCalc-armeabi-v7a.apk` | APK for 32-bit ARM devices |
-| `DeepCalc-x86.apk` | APK for x86 devices |
-| `DeepCalc-x86_64.apk` | APK for 64-bit x86 devices |
-| `DeepCalc-release.aab` | Android App Bundle for store distribution |
-| `SHA256SUMS.txt` | SHA-256 checksums for release files |
+They share the DeepCalc idea and visual identity, but they are separate implementations. They do not share app storage or automatically synchronise data.
 
-For a normal Android installation, choose **DeepCalc-Universal.apk**. Android may ask you to allow installation from the browser or file manager you used to download it.
+---
 
-## Features
+## Choose your DeepCalc
 
-- **Calculation sheets:** work through multi-line calculations with live results.
-- **Variables:** define reusable values such as `$price = 49.99`.
-- **Previous results:** refer to earlier answers with `$1`, `$2`, and so on.
-- **Notes:** add separate notes without affecting calculation results.
-- **Editing:** use the built-in keypad or your device keyboard.
-- **History:** save named snapshots and reopen, rename or delete them.
-- **Themes:** choose from System, Light, Dark and AMOLED appearances, with accent palettes.
-- **Local-first storage:** your sheets stay on your device.
+| | Web / PWA | Native Android |
+|---|---|---|
+| Open / install | [Open Web App](https://prasannaone.github.io/DeepCalc/) | [Download Android app](https://github.com/PrasannaOne/DeepCalc/releases/latest) |
+| Technology | HTML, CSS and JavaScript | Kotlin and Jetpack Compose |
+| Runs in | Modern web browsers | Android 6.0 and later |
+| Install | Browser's Install app / Add to Home Screen option | Install the signed APK |
+| Offline use | App shell is cached after the first successful visit | Works locally; no Internet permission |
+| Data | Browser-local storage | Device-local storage |
+| Sync between editions | Not available | Not available |
 
-Exact feature availability and presentation can differ between the Web/PWA and Android editions.
+## 1. DeepCalc Web (PWA)
 
-## Quick examples
+**[Open DeepCalc Web ↗](https://prasannaone.github.io/DeepCalc/)**
 
-| Input | Result |
-|---|---:|
-| `12 + 8` | `20` |
-| `(12 + 8) × 2` | `40` |
-| `2 ^ 8` | `256` |
-| `sqrt(81)` | `9` |
-| `100 + 10%` | `110` |
+The web edition runs directly in a browser. On supported browsers, you can install it to your home screen and use it in a standalone app window.
 
-### Variables and previous results
+### Web features
 
-```text
-$price = 49.99
-$quantity = 3
-$price × $quantity
-```
+- Line-by-line calculations with live results.
+- Reusable variables and references to earlier results.
+- Separate notes attached to calculation lines.
+- Built-in calculator keypad and optional system keyboard.
+- Save named sheets in local History.
+- Light, Dark and AMOLED themes with accent palettes.
+- Service-worker caching for offline startup after the app has been loaded successfully.
+- Automatic checks for newly deployed web updates.
 
-```text
-100 + 50
-$1 × 2
-$1 + $2
-```
+### Install the PWA
 
-Start a comment line with `#`:
+1. Open [prasannaone.github.io/DeepCalc](https://prasannaone.github.io/DeepCalc/).
+2. Open your browser's menu.
+3. Choose **Install app** or **Add to Home Screen**, if offered.
 
-```text
-# Monthly budget
-$income = 5000
-$rent = 1500
-$income - $rent
-```
+The first visit requires an internet connection. Later offline availability depends on the browser retaining the app's cached files and local storage.
 
-## Your data and privacy
-
-- Calculations, notes, preferences and saved sheets are stored locally.
-- There is no account or cloud sync.
-- Web/PWA data and Android app data live in separate app environments and do not automatically sync.
-- Clearing browser/site data or clearing Android app storage can erase locally saved work. Keep a separate copy of anything important.
-
-The Android app does not request the Android `INTERNET` permission. See the Android project README for its implementation and privacy details.
-
-## Web / PWA
-
-Open [DeepCalc](https://prasannaone.github.io/DeepCalc/) in a supported browser. Use **Install app** or **Add to Home Screen** if your browser offers it.
-
-The first visit needs an internet connection. The service worker caches the app shell for later offline startup, subject to browser storage policies.
-
-## Android app
-
-The Android edition is a standalone Kotlin and Jetpack Compose application. It is **not a WebView wrapper** and does not simply package the web app.
-
-- Application ID: `com.prasannaone.deepcalc`
-- Minimum Android version: Android 6.0 (API 23)
-- Target / compile SDK: 36
-- Build stack: Kotlin, Jetpack Compose, Gradle 9.7.0 and JDK 21
-
-The expression engine, editor, keypad, themes and local persistence are implemented in the Android source under `DeepCalc-Android/`.
-
-## Automated Android builds
-
-The workflow at [`.github/workflows/android-native.yml`](.github/workflows/android-native.yml) runs tests, builds the Android APK variants and AAB, and publishes a GitHub Release from `main`.
-
-Release signing uses GitHub Actions secrets. Signing keys and passwords must never be committed to the repository. The release workflow creates a version tag automatically from the Android app's `versionName`; increment the app version before publishing a new release.
-
-- [Latest Android release](https://github.com/PrasannaOne/DeepCalc/releases/latest)
-- [Android build history](https://github.com/PrasannaOne/DeepCalc/actions/workflows/android-native.yml)
-
-## Project structure
-
-| Path | Purpose |
-|---|---|
-| `index.html`, `styles.css`, `app.js` | Web/PWA application |
-| `manifest.webmanifest` | PWA metadata and launch settings |
-| `service-worker.js` | Web app caching and offline lifecycle |
-| `DeepCalc-Android/` | Standalone Kotlin Android project |
-| `.github/workflows/android-native.yml` | Android CI, builds and release publishing |
-| `LICENSE` | MIT licence and attribution |
-| `README.md` | Project overview and documentation |
-
-## Run the web app locally
+### Run the web edition locally
 
 From the repository root:
 
@@ -152,33 +68,156 @@ From the repository root:
 python -m http.server 8000
 ```
 
-Then open [http://localhost:8000](http://localhost:8000). A local server is recommended instead of opening `index.html` directly. Service workers require HTTPS or localhost.
+Open [http://localhost:8000](http://localhost:8000). A local server is recommended because service workers require HTTPS or localhost.
 
-## Build the Android app locally
+---
 
-Requirements: JDK 21, Android SDK Platform 36, Android Build Tools 36.0.0 and Gradle 9.7.0.
+## 2. DeepCalc for Android (Native)
 
-From `DeepCalc-Android/`:
+**[Download the latest Android release ↗](https://github.com/PrasannaOne/DeepCalc/releases/latest)**
+
+The Android edition is a standalone native application. It has its own Kotlin expression engine, editor, keypad, themes and local persistence. It is **not a WebView wrapper and is not the old Capacitor package**.
+
+### Android features
+
+- Live results alongside each calculation line.
+- Reusable variables and references to earlier results.
+- Powers, square roots, percentages and comments.
+- Separate notes for individual calculation lines.
+- Dedicated DeepCalc keypad for calculations and Android keyboard for notes.
+- Keyboard switching, focus handling and editor scrolling.
+- Autosaved active sheet and local History for up to 100 saved sheets.
+- Copy Sheet, Copy Complete and Android's native Share menu.
+- System, Light, Dark and AMOLED themes with five accent palettes.
+
+### Download options
+
+Open the [latest GitHub Release](https://github.com/PrasannaOne/DeepCalc/releases/latest) and expand **Assets**.
+
+| Download | Intended use |
+|---|---|
+| **DeepCalc-Universal.apk** | Recommended for most Android phones and tablets |
+| DeepCalc-arm64-v8a.apk | 64-bit ARM devices |
+| DeepCalc-armeabi-v7a.apk | 32-bit ARM devices |
+| DeepCalc-x86.apk | 32-bit x86 devices |
+| DeepCalc-x86_64.apk | 64-bit x86 devices |
+| DeepCalc-release.aab | App Bundle for store distribution, not direct installation |
+| SHA256SUMS.txt | SHA-256 checksums for release files |
+
+For most users, download **DeepCalc-Universal.apk**. Android may ask you to allow installation from the browser or file manager.
+
+**Legacy build note:** older Capacitor-based DeepCalc APKs may still exist in old downloads, backups or third-party listings. They are not the current native Android edition. Use the APKs attached to the latest GitHub Release linked above.
+
+### Android technical details
+
+- Application ID: `com.prasannaone.deepcalc`
+- Minimum Android version: Android 6.0 (API 23)
+- Compile / target SDK: 36
+- Language and UI: Kotlin and Jetpack Compose
+- Build: Android Gradle Plugin 9.3.0, Gradle 9.7.0 and JDK 21
+
+### Build the Android app locally
+
+From `DeepCalc-Android/` with JDK 21 and Android SDK Platform 36 installed:
 
 ```bash
 gradle --no-daemon :app:testDebugUnitTest
 gradle --no-daemon :app:assembleRelease
 ```
 
-To build a universal APK rather than ABI-split APKs:
+To build a universal APK instead of ABI-split APKs:
 
 ```bash
 gradle --no-daemon -Pdeepcalc.abiSplits=false :app:assembleRelease
 ```
 
-See [`DeepCalc-Android/README.md`](DeepCalc-Android/README.md) for Android architecture, source layout and maintenance guidance.
-
-## Credits
-
-DeepCalc is developed by [PrasannaOne](https://github.com/PrasannaOne).
-
-The project builds on [SoulCalc](https://github.com/tigrino/soulcalc), originally created by **Albert “Tigr” Zenkoff**. The original MIT licence and attribution are retained in this repository.
+See [DeepCalc-Android/README.md](DeepCalc-Android/README.md) for Android architecture, source layout, privacy details and maintenance guidance.
 
 ---
 
-<p align="center"><strong>Built with care, one calculation at a time. ❤️</strong></p>
+## Working with calculations
+
+Both editions support the core notepad-calculator workflow. For example:
+
+```text
+# Order total
+$price = 49.99
+$quantity = 3
+$price * $quantity
+```
+
+You can reference earlier successful results with `$1`, `$2`, and so on. Start a comment line with `#`.
+
+A few basic expressions:
+
+| Expression | Result |
+|---|---:|
+| `12 + 8` | `20` |
+| `(12 + 8) * 2` | `40` |
+| `2 ^ 8` | `256` |
+| `sqrt(81)` | `9` |
+| `100 + 10%` | `110` |
+
+The two editions are maintained independently, so small differences in interface and feature availability may exist.
+
+## Privacy and storage
+
+- There is no DeepCalc account or built-in cloud sync.
+- Web/PWA sheets and settings are stored in the browser's local storage.
+- Android sheets and settings are stored locally by the Android app.
+- Data does not automatically move between the Web/PWA and Android editions.
+- Clearing browser/site data or Android app storage can erase locally saved work. Export or copy anything important before clearing data.
+- The native Android manifest does not request the `INTERNET` permission. The app contains no advertising or analytics SDKs.
+
+The Web/PWA needs a network connection for its first load and for receiving new deployments. Its cached app shell can support later offline startup, subject to browser storage policies.
+
+## Repository layout
+
+```text
+.
+├── index.html
+├── styles.css
+├── app.js
+├── manifest.webmanifest
+├── service-worker.js
+├── icon-*.png
+├── og-image.png
+├── DeepCalc-Android/
+│   ├── app/
+│   ├── fastlane/
+│   ├── fdroid/
+│   └── README.md
+├── .github/
+│   └── workflows/
+│       └── android-native.yml
+├── LICENSE
+└── README.md
+```
+
+- The repository root contains the **Web/PWA** source.
+- `DeepCalc-Android/` contains the independent **native Android** project.
+- `.github/workflows/android-native.yml` tests, builds and publishes Android releases.
+
+## Releases and versioning
+
+Android releases are built by GitHub Actions when relevant native source or workflow files change on `main`. The workflow runs unit tests, builds APK variants and an Android App Bundle, then publishes the release assets to GitHub Releases.
+
+The release tag is generated from the Android app's `versionName`. Before publishing a new Android version, update both `versionName` and `versionCode` in `DeepCalc-Android/app/build.gradle.kts`.
+
+- [Latest Android release](https://github.com/PrasannaOne/DeepCalc/releases/latest)
+- [Android build workflow](https://github.com/PrasannaOne/DeepCalc/actions/workflows/android-native.yml)
+- [All releases](https://github.com/PrasannaOne/DeepCalc/releases)
+
+## Credits and licence
+
+DeepCalc is maintained by [PrasannaOne](https://github.com/PrasannaOne).
+
+The project builds on [SoulCalc](https://github.com/tigrino/soulcalc), originally created by Albert “Tigr” Zenkoff. The original MIT licence and attribution are retained in the repository. See [LICENSE](LICENSE).
+
+---
+
+<div align="center">
+
+**Made with care, one calculation at a time. ❤️**
+
+</div>
