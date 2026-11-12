@@ -1,20 +1,16 @@
 package com.prasannaone.deepcalc
 
-import android.content.Context
 import android.content.Intent
-import android.os.Bundle
 import android.os.Build
+import android.os.Bundle
 import android.view.WindowManager
-import androidx.core.view.WindowCompat
-import androidx.compose.runtime.SideEffect
-import androidx.compose.ui.graphics.toArgb
+
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.relocation.BringIntoViewRequester
@@ -31,27 +27,23 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Smartphone
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalViewConfiguration
-import androidx.compose.ui.platform.ViewConfiguration
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.onClick
-import androidx.compose.ui.semantics.role
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -64,9 +56,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.core.view.WindowCompat
+
 import kotlinx.coroutines.delay
-import org.json.JSONArray
-import org.json.JSONObject
 import java.text.DateFormat
 import java.util.Date
 
@@ -79,98 +71,6 @@ class MainActivity : ComponentActivity() {
         window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
         setContent { DeepCalcApp() }
     }
-}
-
-private data class SavedSheet(
-    val id: String,
-    var title: String,
-    val createdAt: Long,
-    val lines: List<String>,
-    val notes: List<String>
-)
-
-private data class AppSnapshot(
-    val lines: List<String>,
-    val notes: List<String>,
-    val focus: Int,
-    val savedSheets: List<SavedSheet>,
-    val theme: String,
-    val accent: String
-)
-
-private object LocalStore {
-    private const val PREFS = "deepcalc-native-v1"
-
-    fun load(context: Context): AppSnapshot {
-        val p = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        val storedLines = runCatching { JSONArray(p.getString("active_lines", "[\"\"]") ?: "[\"\"]").toStrings() }.getOrDefault(listOf(""))
-            .ifEmpty { listOf("") }
-        val storedNotes = runCatching { JSONArray(p.getString("active_notes", "[]") ?: "[]").toStrings() }.getOrDefault(emptyList())
-        val lines = storedLines.toMutableList().apply { if (last().trim().isNotEmpty()) add("") }
-        val notes = lines.indices.map { storedNotes.getOrElse(it) { "" } }
-        val storedFocus = p.getInt("focus", 0)
-        val focus = if (storedFocus >= storedLines.lastIndex) lines.lastIndex else storedFocus.coerceIn(0, lines.lastIndex)
-        val history = runCatching {
-            val array = JSONArray(p.getString("history", "[]") ?: "[]")
-            (0 until array.length()).mapNotNull { i ->
-                val o = array.optJSONObject(i) ?: return@mapNotNull null
-                val l = o.optJSONArray("lines")?.toStrings() ?: return@mapNotNull null
-                SavedSheet(o.optString("id"), o.optString("title", "Untitled sheet"), o.optLong("createdAt"), l,
-                    o.optJSONArray("notes")?.toStrings() ?: emptyList())
-            }
-        }.getOrDefault(emptyList())
-        return AppSnapshot(lines, notes, focus, history,
-            p.getString("theme", "system") ?: "system", p.getString("accent", "purple") ?: "purple")
-    }
-
-    fun save(context: Context, lines: List<String>, notes: List<String>, focus: Int,
-             history: List<SavedSheet>, theme: String, accent: String) {
-        val activeLines = JSONArray().apply { lines.forEach { put(it) } }.toString()
-        val activeNotes = JSONArray().apply { lines.indices.forEach { put(notes.getOrElse(it) { "" }) } }.toString()
-        val records = JSONArray().apply {
-            history.forEach { item ->
-                put(JSONObject().apply {
-                    put("id", item.id); put("title", item.title); put("createdAt", item.createdAt)
-                    put("lines", JSONArray(item.lines)); put("notes", JSONArray(item.notes))
-                })
-            }
-        }.toString()
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-            .putString("active_lines", activeLines).putString("active_notes", activeNotes)
-            .putInt("focus", focus).putString("history", records)
-            .putString("theme", theme).putString("accent", accent).remove("custom_keyboard").apply()
-    }
-
-    private fun JSONArray.toStrings(): List<String> = (0 until length()).map { optString(it, "") }
-}
-
-private data class Palette(
-    val surface: Color, val raised: Color, val soft: Color, val variant: Color,
-    val input: Color, val text: Color, val muted: Color, val outline: Color,
-    val primary: Color, val primaryStrong: Color, val primaryContainer: Color,
-    val secondaryContainer: Color, val secondaryText: Color, val keyAccent: Color,
-    val keyAccentText: Color, val error: Color, val noteAccent: Color
-)
-
-private fun palette(theme: String, accent: String, systemDark: Boolean): Palette {
-    val dark = theme == "dark" || theme == "amoled" || (theme == "system" && systemDark)
-    val black = theme == "amoled"
-    val base = when {
-        black -> Palette(Color.Black, Color(0xFF080808), Color(0xFF101010), Color(0xFF1B1B1B), Color(0xFF101010), Color(0xFFF4F0F8), Color(0xFFB9B2C2), Color(0xFF68616F), Color(0xFFD0B5FF), Color(0xFFE0CEFF), Color(0xFF211632), Color(0xFF211A2B), Color(0xFFEEE3FF), Color(0xFF3B2A56), Color(0xFFF5EDFF), Color(0xFFFFB4AB), Color(0xFFA992D2))
-        dark -> Palette(Color(0xFF14121A), Color(0xFF1C1924), Color(0xFF211D2A), Color(0xFF302B3A), Color(0xFF211E29), Color(0xFFF0EBF7), Color(0xFFC1B8CE), Color(0xFF81788E), Color(0xFFC4A7FF), Color(0xFFD4C0FF), Color(0xFF302447), Color(0xFF332A45), Color(0xFFE9DDFF), Color(0xFF4A3868), Color(0xFFF1E8FF), Color(0xFFFFB4AB), Color(0xFFB19BD8))
-        else -> Palette(Color(0xFFFBFAFF), Color.White, Color(0xFFF3F0FA), Color(0xFFE9E5F1), Color(0xFFF2EFF8), Color(0xFF201B2B), Color(0xFF716B7D), Color(0xFFAAA2B7), Color(0xFF7251B5), Color(0xFF60409F), Color(0xFFEEE5FF), Color(0xFFE9E1F7), Color(0xFF392B55), Color(0xFFDED0FF), Color(0xFF38245F), Color(0xFFB3261E), Color(0xFFA18ACB))
-    }
-    val colors = when (accent) {
-        "blue" -> if (dark) listOf(Color(0xFFA9C7FF), Color(0xFFC3D7FF), Color(0xFF20334F), Color(0xFF293F60), Color(0xFFE8F0FF), Color(0xFF91ADD8)) else listOf(Color(0xFF426DA9), Color(0xFF315B98), Color(0xFFE0EBFF), Color(0xFFD5E4FF), Color(0xFF1E3B66), Color(0xFF829FC8))
-        "emerald" -> if (dark) listOf(Color(0xFF91D5B4), Color(0xFFB0E6CB), Color(0xFF1D4032), Color(0xFF244B3A), Color(0xFFE0FFED), Color(0xFF8DBDA4)) else listOf(Color(0xFF28775A), Color(0xFF1C6449), Color(0xFFD9F2E6), Color(0xFFD2F0E1), Color(0xFF174B38), Color(0xFF7AAA94))
-        "rose" -> if (dark) listOf(Color(0xFFF0A9C3), Color(0xFFFFC2D5), Color(0xFF4B2938), Color(0xFF583244), Color(0xFFFFE8EF), Color(0xFFCF9AAF)) else listOf(Color(0xFFA64E70), Color(0xFF913D60), Color(0xFFFFE1EB), Color(0xFFFFDFEB), Color(0xFF67263F), Color(0xFFC58BA3))
-        "amber" -> if (dark) listOf(Color(0xFFE9C078), Color(0xFFF4D49B), Color(0xFF49391F), Color(0xFF59431F), Color(0xFFFFF0CF), Color(0xFFC4A878)) else listOf(Color(0xFF916112), Color(0xFF79500A), Color(0xFFFFEDC9), Color(0xFFFFEDC9), Color(0xFF65420C), Color(0xFFB89A68))
-        else -> if (dark) listOf(Color(0xFFC4A7FF), Color(0xFFD4C0FF), Color(0xFF302447), Color(0xFF4A3868), Color(0xFFF1E8FF), Color(0xFFB19BD8)) else listOf(Color(0xFF7251B5), Color(0xFF60409F), Color(0xFFEEE5FF), Color(0xFFDED0FF), Color(0xFF38245F), Color(0xFFA18ACB))
-    }
-    return base.copy(primary = colors[0], primaryStrong = colors[1], primaryContainer = colors[2],
-        secondaryContainer = if (accent == "purple") base.secondaryContainer else colors[2],
-        secondaryText = if (accent == "purple") base.secondaryText else colors[4],
-        keyAccent = colors[3], keyAccentText = colors[4], noteAccent = colors[5])
 }
 
 @Composable
@@ -197,6 +97,15 @@ private fun DeepCalcApp() {
 
     var lineFields by remember { mutableStateOf(initial.lines.map { TextFieldValue(it) }) }
     var notes by remember { mutableStateOf(initial.notes) }
+    // Row IDs never depend on a row's current position. This prevents Compose from
+    // reusing a deleted row's FocusRequester/scroll state for its next neighbour.
+    var rowIds by remember { mutableStateOf(initial.lines.indices.map { it.toLong() + 1L }) }
+    var nextRowId by remember { mutableLongStateOf(initial.lines.size.toLong() + 1L) }
+    fun allocateRowId(): Long {
+        val id = nextRowId
+        nextRowId += 1L
+        return id
+    }
     var savedSheets by remember { mutableStateOf(initial.savedSheets) }
     var focusedLine by remember { mutableIntStateOf(initial.focus) }
     var activeEditor by remember { mutableStateOf<ActiveEditor>(ActiveEditor.Calculation(initial.focus)) }
@@ -220,14 +129,18 @@ private fun DeepCalcApp() {
     // The custom keypad waits for the Android IME to finish closing before it
     // enters the layout. This prevents even a transition frame with both shown.
     var calculatorKeyboardVisible by remember { mutableStateOf(true) }
-    val showCalculatorKeyboard = keyboardRoute.showCalculatorKeyboard && calculatorKeyboardVisible
+    val showCalculatorKeyboard = shouldShowCalculatorKeyboard(
+        keyboardRoute,
+        imeVisible,
+        calculatorKeyboardVisible
+    )
     val noteFocused = activeEditor is ActiveEditor.Note
 
     fun activateCalculation(index: Int) {
-        val target = ActiveEditor.Calculation(index)
-        if (activeEditor != target) calculationKeyboardMode = CalculationKeyboardMode.DEEPCALC
-        activeEditor = target
-        focusedLine = index
+        val safeIndex = index.coerceIn(0, lineFields.lastIndex)
+        calculationKeyboardMode = calculationModeAfterFocusChange(activeEditor, calculationKeyboardMode)
+        activeEditor = ActiveEditor.Calculation(safeIndex)
+        focusedLine = safeIndex
     }
 
     val currentLines = lineFields.map { it.text }
@@ -277,14 +190,20 @@ private fun DeepCalcApp() {
     }
     fun removeLine(index: Int) {
         if (lineFields.size <= 1) {
-            lineFields = listOf(TextFieldValue("")); notes = listOf(""); focusedLine = 0
+            lineFields = listOf(TextFieldValue(""))
+            notes = listOf("")
+            rowIds = removeStableRowId(rowIds, 0, allocateRowId())
+            expandedNotes = emptySet()
+            focusedLine = 0
         } else {
-            val removedNumber = index + 1
-            lineFields = lineFields.filterIndexed { i, _ -> i != index }
+            val safeIndex = index.coerceIn(0, lineFields.lastIndex)
+            val removedNumber = safeIndex + 1
+            lineFields = lineFields.filterIndexed { i, _ -> i != safeIndex }
                 .map { it.copy(text = CalculatorEngine.shiftReferencesForRemove(it.text, removedNumber)) }
-            notes = notes.filterIndexed { i, _ -> i != index }
-            expandedNotes = expandedNotes.filter { it != index }.map { if (it > index) it - 1 else it }.toSet()
-            focusedLine = (index - 1).coerceAtLeast(0)
+            notes = notes.filterIndexed { i, _ -> i != safeIndex }
+            rowIds = removeStableRowId(rowIds, safeIndex, allocateRowId())
+            expandedNotes = expandedNotes.filter { it != safeIndex }.map { if (it > safeIndex) it - 1 else it }.toSet()
+            focusedLine = (safeIndex - 1).coerceAtLeast(0).coerceAtMost(lineFields.lastIndex)
         }
         activateCalculation(focusedLine)
         persist(); focusEpoch++
@@ -295,6 +214,7 @@ private fun DeepCalcApp() {
         lineFields = lineFields.map { it.copy(text = CalculatorEngine.shiftReferencesForInsert(it.text, number)) }
             .toMutableList().also { it.add(safe, TextFieldValue("")) }
         notes = notes.toMutableList().also { it.add(safe, "") }
+        rowIds = insertStableRowId(rowIds, safe, allocateRowId())
         expandedNotes = expandedNotes.map { if (it >= safe) it + 1 else it }.toSet()
         activateCalculation(safe)
         persist(); focusEpoch++
@@ -340,7 +260,11 @@ private fun DeepCalcApp() {
     fun openSavedSheet(item: SavedSheet) {
         lineFields = (item.lines.ifEmpty { listOf("") }).map { TextFieldValue(it) }
         notes = lineFields.indices.map { item.notes.getOrElse(it) { "" } }
-        if (lineFields.last().text.trim().isNotEmpty()) { lineFields = lineFields + TextFieldValue(""); notes = notes + "" }
+        if (lineFields.last().text.trim().isNotEmpty()) {
+            lineFields = lineFields + TextFieldValue("")
+            notes = notes + ""
+        }
+        rowIds = List(lineFields.size) { allocateRowId() }
         expandedNotes = emptySet()
         calculationKeyboardMode = CalculationKeyboardMode.DEEPCALC
         activateCalculation(lineFields.lastIndex)
@@ -361,29 +285,37 @@ private fun DeepCalcApp() {
     // A single routing decision owns both keyboard surfaces. The custom keypad
     // is rendered only for a calculation target in DEEPCALC mode; the Android
     // IME is requested for notes, Android-mode calculations and the save dialog.
-    LaunchedEffect(keyboardRoute, imeVisible) {
+    LaunchedEffect(keyboardRoute) {
+        calculatorKeyboardVisible = false
+        if (keyboardRoute.showCalculatorKeyboard) {
+            // If we're returning from Notes or Android-keyboard mode, wait in
+            // the inset observer below until the IME has completely closed.
+            if (!imeVisible) calculatorKeyboardVisible = true
+            else keyboard?.hide()
+        } else if (keyboardRoute.showSystemKeyboard && activeDialog != "save") {
+            // Wait one frame for the newly active field to receive focus before
+            // requesting the system IME. A manual Back dismissal is not retried.
+            withFrameNanos { }
+            keyboard?.show()
+        } else {
+            keyboard?.hide()
+        }
+    }
+    LaunchedEffect(keyboardRoute.showCalculatorKeyboard, imeVisible) {
         if (keyboardRoute.showCalculatorKeyboard) {
             if (imeVisible) {
-                // Keep the custom keypad hidden until Android reports that its
-                // own keyboard has fully closed.
+                calculatorKeyboardVisible = false
                 keyboard?.hide()
-            } else if (!calculatorKeyboardVisible) {
-                calculatorKeyboardVisible = true
-            }
-        } else {
-            calculatorKeyboardVisible = false
-            if (keyboardRoute.showSystemKeyboard) {
-                delay(180)
-                keyboard?.show()
             } else {
-                keyboard?.hide()
+                calculatorKeyboardVisible = true
             }
         }
     }
     LaunchedEffect(activeDialog) {
         if (activeDialog == "save") {
-            delay(100)
+            withFrameNanos { }
             runCatching { sheetNameRequester.requestFocus() }
+            withFrameNanos { }
             keyboard?.show()
         }
     }
@@ -399,7 +331,12 @@ private fun DeepCalcApp() {
     CompositionLocalProvider(LocalViewConfiguration provides deepCalcViewConfiguration) {
       MaterialTheme(colorScheme = colorScheme) {
       Box(Modifier.fillMaxSize().background(colors.surface)) {
-        Column(Modifier.fillMaxSize().background(colors.surface).safeDrawingPadding().imePadding()) {
+        Column(
+            Modifier.fillMaxSize()
+                .background(colors.surface)
+                .safeDrawingPadding()
+                .then(if (keyboardRoute.showSystemKeyboard && imeVisible) Modifier.imePadding() else Modifier)
+        ) {
             // Header mirrors the 58–62dp DeepCalc top bar.
             Row(Modifier.widthIn(max = 960.dp).fillMaxWidth().align(Alignment.CenterHorizontally).height(topBarHeight)
                 .padding(start = if (compactWidth) 15.dp else 20.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -416,20 +353,37 @@ private fun DeepCalcApp() {
                 Box {
                     IconButton(onClick = { menuExpanded = true }) { Icon(Icons.Filled.MoreVert, contentDescription = "Menu", tint = colors.muted) }
                     DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }, containerColor = colors.raised) {
-                        MenuHeader("SHEET", colors)
-                        DropdownMenuItem(text = { Text("Copy Sheet") }, onClick = { menuExpanded = false; copyText(sheetCopy(false), "Sheet copied") })
-                        DropdownMenuItem(text = { Text("Copy Complete") }, onClick = { menuExpanded = false; copyText(sheetCopy(true), "Complete sheet copied") })
-                        DropdownMenuItem(text = { Text("Save Sheet") }, onClick = { menuExpanded = false; sheetName = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date()); renameId = null; activeDialog = "save" })
-                        DropdownMenuItem(text = { Text("Clear Sheet") }, onClick = { menuExpanded = false; lineFields = listOf(TextFieldValue("")); notes = listOf(""); expandedNotes = emptySet(); calculationKeyboardMode = CalculationKeyboardMode.DEEPCALC; activateCalculation(0); persist(); focusEpoch++ })
-                        HorizontalDivider(color = colors.variant)
-                        MenuHeader("APP", colors)
-                        DropdownMenuItem(text = { Text("History") }, onClick = { menuExpanded = false; activeDialog = "history" })
-                        DropdownMenuItem(text = { Text("Guide") }, onClick = { menuExpanded = false; activeDialog = "guide" })
-                        DropdownMenuItem(text = { Text("Settings") }, onClick = { menuExpanded = false; activeDialog = "settings" })
-                        HorizontalDivider(color = colors.variant)
-                        MenuHeader("MORE", colors)
-                        DropdownMenuItem(text = { Text("Share") }, onClick = { menuExpanded = false; shareApp() })
-                        DropdownMenuItem(text = { Text("About") }, onClick = { menuExpanded = false; activeDialog = "about" })
+                        Column(Modifier.widthIn(min = 184.dp).padding(vertical = 4.dp)) {
+                            MenuHeader("SHEET", colors)
+                            CompactMenuItem("Copy Sheet", colors) { menuExpanded = false; copyText(sheetCopy(false), "Sheet copied") }
+                            CompactMenuItem("Copy Complete", colors) { menuExpanded = false; copyText(sheetCopy(true), "Complete sheet copied") }
+                            CompactMenuItem("Save Sheet", colors) {
+                                menuExpanded = false
+                                sheetName = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date())
+                                renameId = null
+                                activeDialog = "save"
+                            }
+                            CompactMenuItem("Clear Sheet", colors) {
+                                menuExpanded = false
+                                lineFields = listOf(TextFieldValue(""))
+                                notes = listOf("")
+                                rowIds = listOf(allocateRowId())
+                                expandedNotes = emptySet()
+                                calculationKeyboardMode = CalculationKeyboardMode.DEEPCALC
+                                activateCalculation(0)
+                                persist()
+                                focusEpoch++
+                            }
+                            HorizontalDivider(color = colors.variant)
+                            MenuHeader("APP", colors)
+                            CompactMenuItem("History", colors) { menuExpanded = false; activeDialog = "history" }
+                            CompactMenuItem("Guide", colors) { menuExpanded = false; activeDialog = "guide" }
+                            CompactMenuItem("Settings", colors) { menuExpanded = false; activeDialog = "settings" }
+                            HorizontalDivider(color = colors.variant)
+                            MenuHeader("MORE", colors)
+                            CompactMenuItem("Share", colors) { menuExpanded = false; shareApp() }
+                            CompactMenuItem("About", colors) { menuExpanded = false; activeDialog = "about" }
+                        }
                     }
                 }
             }
@@ -437,110 +391,118 @@ private fun DeepCalcApp() {
             // Sheet: line numbers, editable expressions, expandable notes and live results.
             Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(top = 8.dp, bottom = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 lineFields.forEachIndexed { index, fieldValue ->
-                    if (index in expandedNotes) {
-                        val noteBringIntoViewRequester = remember(index) { BringIntoViewRequester() }
-                        Row(Modifier.widthIn(max = 960.dp).fillMaxWidth()
-                            .bringIntoViewRequester(noteBringIntoViewRequester)
-                            .padding(start = if (compactWidth) 28.dp else 40.dp, end = if (compactWidth) 7.dp else 12.dp, bottom = 3.dp)
-                            .padding(bottom = if (activeEditor == ActiveEditor.Note(index)) 16.dp else 0.dp),
-                            verticalAlignment = Alignment.Top) {
-                            Text("⌃", modifier = Modifier.width(22.dp).padding(top = 1.dp), color = colors.primary, fontSize = 12.sp)
-                            Column(Modifier.weight(1f).padding(start = 9.dp).borderStart(colors.noteAccent)) {
-                                val noteRequester = remember(index) { FocusRequester() }
-                                LaunchedEffect(activeEditor, expandedNotes, focusEpoch, activeDialog) {
-                                    if (activeEditor == ActiveEditor.Note(index) && index in expandedNotes && activeDialog == null) {
-                                        delay(80)
-                                        runCatching { noteRequester.requestFocus() }
-                                        delay(360)
-                                        noteBringIntoViewRequester.bringIntoView()
-                                        delay(100)
-                                        noteBringIntoViewRequester.bringIntoView()
+                    val rowId = rowIds[index]
+                    key(rowId) {
+                        if (index in expandedNotes) {
+                            val noteBringIntoViewRequester = remember(rowId) { BringIntoViewRequester() }
+                            Row(Modifier.widthIn(max = 960.dp).fillMaxWidth()
+                                .bringIntoViewRequester(noteBringIntoViewRequester)
+                                .padding(start = if (compactWidth) 28.dp else 40.dp, end = if (compactWidth) 7.dp else 12.dp, bottom = 3.dp)
+                                .padding(bottom = if (activeEditor == ActiveEditor.Note(index)) 16.dp else 0.dp),
+                                verticalAlignment = Alignment.Top) {
+                                Text("⌃", modifier = Modifier.width(22.dp).padding(top = 1.dp), color = colors.primary, fontSize = 12.sp)
+                                Column(Modifier.weight(1f).padding(start = 9.dp).borderStart(colors.noteAccent)) {
+                                    val noteRequester = remember(rowId) { FocusRequester() }
+                                    LaunchedEffect(rowId, activeEditor, expandedNotes, focusEpoch, activeDialog) {
+                                        if (activeEditor == ActiveEditor.Note(index) && index in expandedNotes && activeDialog == null) {
+                                            runCatching { noteRequester.requestFocus() }
+                                        }
                                     }
+                                    LaunchedEffect(rowId, activeEditor, imeVisible, notes.getOrElse(index) { "" }) {
+                                        if (activeEditor == ActiveEditor.Note(index) && index in expandedNotes) {
+                                            withFrameNanos { }
+                                            noteBringIntoViewRequester.bringIntoView()
+                                        }
+                                    }
+                                    BasicTextField(value = notes.getOrElse(index) { "" }, onValueChange = { value ->
+                                        notes = notes.toMutableList().also { while (it.size <= index) it.add(""); it[index] = value }; persist()
+                                    }, modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 21.dp).heightIn(max = 100.dp).focusRequester(noteRequester)
+                                        .onFocusChanged { focusState ->
+                                            if (focusState.isFocused) {
+                                                activeEditor = ActiveEditor.Note(index)
+                                            }
+                                        },
+                                        textStyle = TextStyle(color = colors.text, fontSize = 12.sp, lineHeight = 19.sp),
+                                        cursorBrush = SolidColor(colors.primary), keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Default),
+                                        decorationBox = { inner -> Box { if (notes.getOrElse(index) { "" }.isEmpty()) Text("For notes…", color = colors.muted.copy(alpha = .55f), fontSize = 12.sp); inner() } })
                                 }
-                                BasicTextField(value = notes.getOrElse(index) { "" }, onValueChange = { value ->
-                                    notes = notes.toMutableList().also { while (it.size <= index) it.add(""); it[index] = value }; persist()
-                                }, modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 21.dp).heightIn(max = 100.dp).focusRequester(noteRequester)
-                                    .onFocusChanged { focusState ->
-                                        if (focusState.isFocused) {
-                                            activeEditor = ActiveEditor.Note(index)
+                            }
+                        }
+                        val requester = remember(rowId) { FocusRequester() }
+                        val lineBringIntoViewRequester = remember(rowId) { BringIntoViewRequester() }
+                        LaunchedEffect(rowId, focusEpoch, activeEditor, activeDialog) {
+                            if (activeDialog == null && activeEditor == ActiveEditor.Calculation(index)) {
+                                runCatching { requester.requestFocus() }
+                            }
+                        }
+                        LaunchedEffect(rowId, activeEditor, imeVisible, fieldValue.text) {
+                            if (activeEditor == ActiveEditor.Calculation(index)) {
+                                withFrameNanos { }
+                                lineBringIntoViewRequester.bringIntoView()
+                            }
+                        }
+                        val result = results.getOrNull(index) ?: CalculatorEngine.LineResult(CalculatorEngine.LineResult.Kind.EMPTY, "")
+                        val isComment = fieldValue.text.trimStart().startsWith("#")
+                        Row(Modifier.widthIn(max = 960.dp).fillMaxWidth()
+                            .bringIntoViewRequester(lineBringIntoViewRequester)
+                            .padding(horizontal = if (compactWidth) 6.dp else 12.dp, vertical = 4.dp)
+                            .padding(bottom = if (activeEditor == ActiveEditor.Calculation(index)) 16.dp else 0.dp),
+                            verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier.width(if (compactWidth) 24.dp else 28.dp).height(36.dp)
+                                    .clip(RoundedCornerShape(7.dp))
+                                    .clickable(role = Role.Button) {
+                                        copyText(fieldValue.text, if (fieldValue.text.isBlank()) "Line is empty" else "Copied: ${fieldValue.text.trim()}")
+                                    },
+                                contentAlignment = Alignment.CenterEnd
+                            ) {
+                                Text((index + 1).toString(), modifier = Modifier.padding(end = if (compactWidth) 5.dp else 7.dp),
+                                    color = colors.muted.copy(alpha = .72f), textAlign = TextAlign.End, fontSize = 11.sp)
+                            }
+                            Row(Modifier.weight(7f).defaultMinSize(minHeight = 36.dp).clip(RoundedCornerShape(11.dp))
+                                .background(colors.input).border(1.dp, if (focusedLine == index && !noteFocused) colors.primary.copy(alpha = .52f) else Color.Transparent, RoundedCornerShape(11.dp))
+                                .padding(start = 11.dp, end = 3.dp, top = 6.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                BasicTextField(value = fieldValue, onValueChange = { next ->
+                                    lineFields = lineFields.toMutableList().also { it[index] = next }; focusedLine = index; persist()
+                                },
+                                    // The value-based BasicTextField cannot opt out of IME-on-focus
+                                    // through KeyboardOptions. Read-only keeps focus/cursor selection
+                                    // but prevents Android's keyboard from flashing in keypad mode.
+                                    readOnly = !keyboardRoute.showSystemKeyboard,
+                                    modifier = Modifier.weight(1f).defaultMinSize(minHeight = 23.dp).focusRequester(requester)
+                                    .onFocusChanged {
+                                        if (it.isFocused) {
+                                            activateCalculation(index)
                                         }
                                     },
-                                    textStyle = TextStyle(color = colors.text, fontSize = 12.sp, lineHeight = 19.sp),
-                                    cursorBrush = SolidColor(colors.primary), keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Default),
-                                    decorationBox = { inner -> Box { if (notes.getOrElse(index) { "" }.isEmpty()) Text("For notes…", color = colors.muted.copy(alpha = .55f), fontSize = 12.sp); inner() } })
-                            }
-                        }
-                    }
-                    val requester = remember(index) { FocusRequester() }
-                    val lineBringIntoViewRequester = remember(index) { BringIntoViewRequester() }
-                    LaunchedEffect(focusEpoch, activeEditor, keyboardRoute, activeDialog) {
-                        if (activeDialog == null && activeEditor == ActiveEditor.Calculation(index)) {
-                            delay(70)
-                            runCatching { requester.requestFocus() }
-                            // Let IME/window resizing finish before asking the
-                            // scroll container to reveal the complete active row.
-                            delay(360)
-                            lineBringIntoViewRequester.bringIntoView()
-                            delay(100)
-                            lineBringIntoViewRequester.bringIntoView()
-                        }
-                    }
-                    val result = results.getOrNull(index) ?: CalculatorEngine.LineResult(CalculatorEngine.LineResult.Kind.EMPTY, "")
-                    val isComment = fieldValue.text.trimStart().startsWith("#")
-                    Row(Modifier.widthIn(max = 960.dp).fillMaxWidth()
-                        .bringIntoViewRequester(lineBringIntoViewRequester)
-                        .padding(horizontal = if (compactWidth) 6.dp else 12.dp, vertical = 4.dp)
-                        .padding(bottom = if (activeEditor == ActiveEditor.Calculation(index)) 16.dp else 0.dp),
-                        verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier.width(if (compactWidth) 24.dp else 28.dp).height(36.dp)
-                                .clip(RoundedCornerShape(7.dp))
-                                .clickable(role = Role.Button) {
-                                    copyText(fieldValue.text, if (fieldValue.text.isBlank()) "Line is empty" else "Copied: ${fieldValue.text.trim()}")
-                                },
-                            contentAlignment = Alignment.CenterEnd
-                        ) {
-                            Text((index + 1).toString(), modifier = Modifier.padding(end = if (compactWidth) 5.dp else 7.dp),
-                                color = colors.muted.copy(alpha = .72f), textAlign = TextAlign.End, fontSize = 11.sp)
-                        }
-                        Row(Modifier.weight(7f).defaultMinSize(minHeight = 36.dp).clip(RoundedCornerShape(11.dp))
-                            .background(colors.input).border(1.dp, if (focusedLine == index && !noteFocused) colors.primary.copy(alpha = .52f) else Color.Transparent, RoundedCornerShape(11.dp))
-                            .padding(start = 11.dp, end = 3.dp, top = 6.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                            BasicTextField(value = fieldValue, onValueChange = { next ->
-                                lineFields = lineFields.toMutableList().also { it[index] = next }; focusedLine = index; persist()
-                            }, modifier = Modifier.weight(1f).defaultMinSize(minHeight = 23.dp).focusRequester(requester)
-                                .onFocusChanged {
-                                    if (it.isFocused) {
+                                    textStyle = TextStyle(color = if (isComment) colors.muted else colors.text, fontSize = if (compactWidth) 14.sp else 15.sp,
+                                        lineHeight = 23.sp, fontFamily = if (isComment) FontFamily.SansSerif else FontFamily.Monospace),
+                                    cursorBrush = SolidColor(colors.primary), keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None,
+                                        autoCorrectEnabled = false, keyboardType = KeyboardType.Ascii, imeAction = ImeAction.Next),
+                                    keyboardActions = KeyboardActions(onNext = { insertNewLine(index + 1) }),
+                                    decorationBox = { inner -> Box(Modifier.fillMaxWidth().heightIn(min = 23.dp), contentAlignment = Alignment.CenterStart) { inner() } })
+                                IconButton(onClick = {
+                                    val closingNotes = index in expandedNotes
+                                    expandedNotes = if (closingNotes) expandedNotes - index else expandedNotes + index
+                                    if (closingNotes) {
                                         activateCalculation(index)
+                                        focusEpoch++
+                                    } else {
+                                        activeEditor = ActiveEditor.Note(index)
                                     }
-                                },
-                                textStyle = TextStyle(color = if (isComment) colors.muted else colors.text, fontSize = if (compactWidth) 14.sp else 15.sp,
-                                    lineHeight = 23.sp, fontFamily = if (isComment) FontFamily.SansSerif else FontFamily.Monospace),
-                                cursorBrush = SolidColor(colors.primary), keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None,
-                                    autoCorrectEnabled = false, keyboardType = KeyboardType.Ascii, imeAction = ImeAction.Next),
-                                keyboardActions = KeyboardActions(onNext = { insertNewLine(index + 1) }),
-                                decorationBox = { inner -> Box(Modifier.fillMaxWidth().heightIn(min = 23.dp), contentAlignment = Alignment.CenterStart) { inner() } })
-                            IconButton(onClick = {
-                                val closingNotes = index in expandedNotes
-                                expandedNotes = if (closingNotes) expandedNotes - index else expandedNotes + index
-                                if (closingNotes) {
-                                    activateCalculation(index)
-                                    focusEpoch++
-                                } else {
-                                    activeEditor = ActiveEditor.Note(index)
+                                    persist()
+                                }, modifier = Modifier.size(32.dp)) {
+                                    Text(if (index in expandedNotes) "⌄" else "⌃", color = if (index in expandedNotes) colors.primary else colors.muted.copy(alpha = .65f), fontSize = 12.sp)
                                 }
-                                persist()
-                            }, modifier = Modifier.size(32.dp)) {
-                                Text(if (index in expandedNotes) "⌄" else "⌃", color = if (index in expandedNotes) colors.primary else colors.muted.copy(alpha = .65f), fontSize = 12.sp)
                             }
-                        }
-                        Box(Modifier.weight(3f).padding(start = 3.dp).defaultMinSize(minHeight = 36.dp)
-                            .clip(RoundedCornerShape(11.dp)).background(colors.primaryContainer.copy(alpha = .48f)).padding(horizontal = 7.dp, vertical = 6.dp),
-                            contentAlignment = Alignment.TopEnd) {
-                            Text(result.text, modifier = Modifier.clickable(enabled = result.kind == CalculatorEngine.LineResult.Kind.SUCCESS) { copyText(result.text, "Copied: ${result.text}") },
-                                color = when (result.kind) { CalculatorEngine.LineResult.Kind.ERROR -> colors.error; CalculatorEngine.LineResult.Kind.EMPTY -> colors.muted; else -> colors.primaryStrong },
-                                textAlign = TextAlign.End, fontFamily = FontFamily.Monospace, fontSize = if (compactWidth) 13.sp else 14.sp, lineHeight = 22.sp,
-                                fontWeight = if (result.kind == CalculatorEngine.LineResult.Kind.SUCCESS) FontWeight.SemiBold else FontWeight.Normal)
+                            Box(Modifier.weight(3f).padding(start = 3.dp).defaultMinSize(minHeight = 36.dp)
+                                .clip(RoundedCornerShape(11.dp)).background(colors.primaryContainer.copy(alpha = .48f)).padding(horizontal = 7.dp, vertical = 6.dp),
+                                contentAlignment = Alignment.TopEnd) {
+                                Text(result.text, modifier = Modifier.clickable(enabled = result.kind == CalculatorEngine.LineResult.Kind.SUCCESS) { copyText(result.text, "Copied: ${result.text}") },
+                                    color = when (result.kind) { CalculatorEngine.LineResult.Kind.ERROR -> colors.error; CalculatorEngine.LineResult.Kind.EMPTY -> colors.muted; else -> colors.primaryStrong },
+                                    textAlign = TextAlign.End, fontFamily = FontFamily.Monospace, fontSize = if (compactWidth) 13.sp else 14.sp, lineHeight = 22.sp,
+                                    fontWeight = if (result.kind == CalculatorEngine.LineResult.Kind.SUCCESS) FontWeight.SemiBold else FontWeight.Normal)
+                            }
                         }
                     }
                 }
@@ -727,103 +689,3 @@ private fun DeepCalcApp() {
     }
 }
 
-@Composable
-private fun MenuHeader(label: String, colors: Palette) {
-    Text(label, Modifier.padding(start = 15.dp, top = 8.dp, bottom = 3.dp), color = colors.muted.copy(alpha = .72f), fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp)
-}
-
-@Composable
-private fun HistoryAction(label: String, primary: Boolean, colors: Palette, onClick: () -> Unit) {
-    Surface(onClick = onClick, shape = RoundedCornerShape(8.dp), color = if (primary) colors.primaryContainer else colors.soft) {
-        Text(label, Modifier.padding(horizontal = 10.dp, vertical = 7.dp), color = if (primary) colors.primary else colors.muted, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-    }
-}
-
-@Composable
-private fun GuideSection(title: String, body: String, colors: Palette) {
-    Text(title, color = colors.primary, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 13.dp, bottom = 4.dp))
-    Text(body, color = colors.text, fontSize = 13.sp, lineHeight = 20.sp)
-}
-
-private fun Modifier.borderStart(color: Color): Modifier = this.then(Modifier.drawBehind {
-    drawLine(color.copy(alpha = .60f), androidx.compose.ui.geometry.Offset(0f, 0f),
-        androidx.compose.ui.geometry.Offset(0f, size.height), strokeWidth = 2.dp.toPx())
-})
-
-@Composable
-private fun CalculatorKeyboard(colors: Palette, onTap: (String) -> Unit, onLong: (String) -> Unit) {
-    val configuration = LocalConfiguration.current
-    val gap = when {
-        configuration.screenWidthDp >= 700 -> 7.dp
-        configuration.screenHeightDp <= 700 -> 4.dp
-        else -> 6.dp
-    }
-    val cellHeight = when {
-        configuration.screenHeightDp <= 560 -> (configuration.screenHeightDp * 0.067f).dp.coerceIn(34.dp, 49.dp)
-        configuration.screenHeightDp <= 700 -> (configuration.screenHeightDp * 0.067f).dp.coerceIn(37.dp, 49.dp)
-        configuration.screenWidthDp <= 420 -> (configuration.screenHeightDp * 0.074f).dp.coerceIn(42.dp, 54.dp)
-        configuration.screenWidthDp >= 700 -> 58.dp
-        else -> (configuration.screenHeightDp * 0.071f).dp.coerceIn(43.dp, 58.dp)
-    }
-    BoxWithConstraints(Modifier.widthIn(max = 960.dp).fillMaxWidth().background(colors.variant)
-        .padding(horizontal = if (configuration.screenWidthDp >= 700) 14.dp else 6.dp,
-            vertical = if (configuration.screenHeightDp <= 700) 5.dp else 9.dp)) {
-        val keys = listOf(
-            listOf("^" to "power", "#" to "hash", "$" to "dollar", "=" to "=", "▣" to "paste"),
-            listOf("7" to "7", "8" to "8", "9" to "9", "÷" to "÷", "%" to "%"),
-            listOf("4" to "4", "5" to "5", "6" to "6", "×" to "×", "()" to "paren")
-        )
-        Column(verticalArrangement = Arrangement.spacedBy(gap)) {
-            keys.forEach { row ->
-                Row(Modifier.fillMaxWidth().height(cellHeight), horizontalArrangement = Arrangement.spacedBy(gap)) {
-                    row.forEach { (label, key) -> KeyboardKey(label, key, Modifier.weight(1f).fillMaxHeight(), colors, onTap, onLong) }
-                }
-            }
-            Box(Modifier.fillMaxWidth().height(cellHeight * 2 + gap)) {
-                Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(gap)) {
-                    Row(Modifier.fillMaxWidth().height(cellHeight), horizontalArrangement = Arrangement.spacedBy(gap)) {
-                        listOf("1" to "1", "2" to "2", "3" to "3", "−" to "−").forEach { (label, key) -> KeyboardKey(label, key, Modifier.weight(1f).fillMaxHeight(), colors, onTap, onLong) }
-                        Spacer(Modifier.weight(1f))
-                    }
-                    Row(Modifier.fillMaxWidth().height(cellHeight), horizontalArrangement = Arrangement.spacedBy(gap)) {
-                        listOf("0" to "0", "." to ".", "⌫" to "backspace", "+" to "+").forEach { (label, key) -> KeyboardKey(label, key, Modifier.weight(1f).fillMaxHeight(), colors, onTap, onLong) }
-                        Spacer(Modifier.weight(1f))
-                    }
-                }
-                Box(Modifier.align(Alignment.TopEnd).width((this@BoxWithConstraints.maxWidth - gap * 4) / 5).height(cellHeight * 2 + gap)) {
-                    KeyboardKey("↵", "enter", Modifier.fillMaxSize(), colors, onTap, onLong, enter = true)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun KeyboardKey(label: String, key: String, modifier: Modifier, colors: Palette,
-                        onTap: (String) -> Unit, onLong: (String) -> Unit, enter: Boolean = false) {
-    val special = key in setOf("power", "hash", "dollar", "=", "paste", "÷", "%", "×", "paren", "−", "+")
-    val danger = key == "backspace" || enter
-    val bg = when { danger -> colors.keyAccent; special -> colors.secondaryContainer; else -> colors.raised }
-    val fg = when { danger -> colors.keyAccentText; special -> colors.secondaryText; else -> colors.text }
-    var longPressVisual by remember(key) { mutableStateOf(false) }
-    Box(modifier.clip(RoundedCornerShape(if (enter) 13.dp else 11.dp)).background(bg)
-        .semantics { role = Role.Button; onClick { onTap(key); true } }
-        .pointerInput(key) {
-            var longTriggered = false
-            detectTapGestures(
-                onTap = { onTap(key) },
-                onLongPress = { longTriggered = true; longPressVisual = true },
-                onPress = {
-                    longTriggered = false
-                    val released = tryAwaitRelease()
-                    if (released && longTriggered) {
-                        if (key in setOf("power", "backspace", "dollar")) onLong(key) else onTap(key)
-                    }
-                    longPressVisual = false
-                }
-            )
-        }, contentAlignment = Alignment.Center) {
-        Text(if (key == "power" && longPressVisual) "√" else label, color = fg,
-            fontSize = if (enter) 25.sp else 19.sp, fontWeight = FontWeight.SemiBold, lineHeight = 24.sp)
-    }
-}

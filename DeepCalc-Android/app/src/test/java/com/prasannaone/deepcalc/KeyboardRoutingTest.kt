@@ -45,6 +45,39 @@ class KeyboardRoutingTest {
         assertTrue(route.showSystemKeyboard)
     }
 
+    @Test fun movingBetweenCalculationRowsPreservesManualAndroidKeyboardChoice() {
+        val nextMode = calculationModeAfterFocusChange(
+            ActiveEditor.Calculation(2), CalculationKeyboardMode.ANDROID
+        )
+        assertEquals(CalculationKeyboardMode.ANDROID, nextMode)
+    }
+
+    @Test fun returningFromNotesRestoresDeepCalcKeyboardChoice() {
+        val nextMode = calculationModeAfterFocusChange(
+            ActiveEditor.Note(2), CalculationKeyboardMode.ANDROID
+        )
+        assertEquals(CalculationKeyboardMode.DEEPCALC, nextMode)
+    }
+
+    @Test fun returningFromNoEditorRestoresDeepCalcKeyboardChoice() {
+        val nextMode = calculationModeAfterFocusChange(
+            ActiveEditor.None, CalculationKeyboardMode.ANDROID
+        )
+        assertEquals(CalculationKeyboardMode.DEEPCALC, nextMode)
+    }
+
+    @Test fun calculatorKeypadNeverRendersWhileAndroidImeIsVisible() {
+        val customRoute = KeyboardRoute(showCalculatorKeyboard = true, showSystemKeyboard = false)
+        assertFalse(shouldShowCalculatorKeyboard(customRoute, imeVisible = true, keypadReady = true))
+        assertFalse(shouldShowCalculatorKeyboard(customRoute, imeVisible = false, keypadReady = false))
+        assertTrue(shouldShowCalculatorKeyboard(customRoute, imeVisible = false, keypadReady = true))
+    }
+
+    @Test fun calculatorKeypadNeverRendersForSystemKeyboardRoute() {
+        val systemRoute = KeyboardRoute(showCalculatorKeyboard = false, showSystemKeyboard = true)
+        assertFalse(shouldShowCalculatorKeyboard(systemRoute, imeVisible = false, keypadReady = true))
+    }
+
     @Test fun noEditorShowsNoKeyboard() {
         assertEquals(
             KeyboardRoute(false, false),

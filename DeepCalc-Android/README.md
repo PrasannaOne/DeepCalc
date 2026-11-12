@@ -28,7 +28,16 @@
 - Kotlin Coroutines
 - Android SDK 36; minimum Android API 23
 
-The expression parser and evaluator live in `app/src/main/java/com/prasannaone/deepcalc/CalculatorEngine.kt`. The UI, local sheet storage, keyboard coordination, menus and dialogs live in `MainActivity.kt`.
+The expression parser and evaluator live in `app/src/main/java/com/prasannaone/deepcalc/CalculatorEngine.kt` and are kept separate from the UI. The Android source is organised into focused files:
+
+- `MainActivity.kt`: screen state, editor rows, focus and keyboard coordination, dialogs.
+- `KeyboardRouting.kt`: keyboard route rules and keyboard-mode transitions.
+- `SheetRowIdentity.kt`: stable row identity operations used to protect focus/scroll state during insertion and deletion.
+- `LocalStore.kt`: local sheet/history persistence.
+- `Palette.kt`: theme and accent palette definitions.
+- `CalculatorComponents.kt`: compact menu rows, history/guide helpers and the custom keypad.
+
+The interaction regression checklist is in `INTERACTION-REGRESSION-CHECKLIST.md`.
 
 ## Build
 

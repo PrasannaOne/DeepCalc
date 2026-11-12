@@ -18,6 +18,25 @@ data class KeyboardRoute(
     val showSystemKeyboard: Boolean
 )
 
+/** Preserve a manual keyboard choice while moving between calculation rows.
+ * Returning from Notes or a non-editor target restores the DeepCalc keypad.
+ */
+fun calculationModeAfterFocusChange(
+    previousEditor: ActiveEditor,
+    currentMode: CalculationKeyboardMode
+): CalculationKeyboardMode = if (previousEditor is ActiveEditor.Calculation) {
+    currentMode
+} else {
+    CalculationKeyboardMode.DEEPCALC
+}
+
+/** Never render DeepCalc's keypad while Android reports a visible IME. */
+fun shouldShowCalculatorKeyboard(
+    route: KeyboardRoute,
+    imeVisible: Boolean,
+    keypadReady: Boolean
+): Boolean = route.showCalculatorKeyboard && !imeVisible && keypadReady
+
 /** Resolves the two keyboard surfaces from one source of truth. */
 fun resolveKeyboardRoute(
     editor: ActiveEditor,
