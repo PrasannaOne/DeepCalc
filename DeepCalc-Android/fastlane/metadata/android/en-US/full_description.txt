@@ -5,7 +5,8 @@ Features:
 • Reusable variables and references to earlier results
 • Powers, square roots, percentages and comments
 • Separate notes beside calculations
-• Dedicated calculator keypad and Android keyboard support
+• Calculation fields open the DeepCalc keypad; notes always use the Android keyboard
+• Switch calculation keyboard from the header, with automatic focus and scroll handling
 • Autosaved active sheet and local History for up to 100 sheets
 • Copy Sheet, Copy Complete and Android's native Share menu
 • System, Light, Dark and AMOLED themes with five accent palettes

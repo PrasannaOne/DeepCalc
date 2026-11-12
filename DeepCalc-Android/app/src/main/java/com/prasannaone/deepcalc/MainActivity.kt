@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.os.Build
+import android.view.WindowManager
 import androidx.core.view.WindowCompat
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.toArgb
@@ -43,6 +44,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.platform.ViewConfiguration
@@ -63,7 +65,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.first
 import org.json.JSONArray
 import org.json.JSONObject
 import java.text.DateFormat
@@ -72,6 +74,10 @@ import java.util.Date
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Compose owns the system-bar and IME insets; resize the viewport when
+        // Android's keyboard opens so the scrollable sheet can reveal its editor.
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
         setContent { DeepCalcApp() }
     }
 }
@@ -175,7 +181,7 @@ private fun DeepCalcApp() {
     val initial = remember { LocalStore.load(context) }
     val clipboard = LocalClipboardManager.current
     val keyboard = LocalSoftwareKeyboardController.current
-    val coroutineScope = rememberCoroutineScope()
+    val density = LocalDensity.current
     val systemDark = androidx.compose.foundation.isSystemInDarkTheme()
     val configuration = LocalConfiguration.current
     val shortScreen = configuration.screenHeightDp <= 700
@@ -191,9 +197,8 @@ private fun DeepCalcApp() {
     var notes by remember { mutableStateOf(initial.notes) }
     var savedSheets by remember { mutableStateOf(initial.savedSheets) }
     var focusedLine by remember { mutableIntStateOf(initial.focus) }
-    var customKeyboard by remember { mutableStateOf(true) }
-    var noteFocused by remember { mutableStateOf(false) }
-    var focusedNoteIndex by remember { mutableStateOf<Int?>(null) }
+    var activeEditor by remember { mutableStateOf<ActiveEditor>(ActiveEditor.Calculation(initial.focus)) }
+    var calculationKeyboardMode by remember { mutableStateOf(CalculationKeyboardMode.DEEPCALC) }
     var themeMode by remember { mutableStateOf(initial.theme) }
     var accentMode by remember { mutableStateOf(initial.accent) }
     var expandedNotes by remember { mutableStateOf(setOf<Int>()) }
@@ -206,6 +211,22 @@ private fun DeepCalcApp() {
     var pendingDelete by remember { mutableStateOf<SavedSheet?>(null) }
     var focusEpoch by remember { mutableIntStateOf(0) }
     val sheetNameRequester = remember { FocusRequester() }
+
+    val keyboardRoute = remember(activeEditor, calculationKeyboardMode, activeDialog) {
+        resolveKeyboardRoute(activeEditor, calculationKeyboardMode, activeDialog)
+    }
+    // The custom keypad waits for the Android IME to finish closing before it
+    // enters the layout. This prevents even a transition frame with both shown.
+    var calculatorKeyboardVisible by remember { mutableStateOf(true) }
+    val showCalculatorKeyboard = keyboardRoute.showCalculatorKeyboard && calculatorKeyboardVisible
+    val noteFocused = activeEditor is ActiveEditor.Note
+
+    fun activateCalculation(index: Int) {
+        val target = ActiveEditor.Calculation(index)
+        if (activeEditor != target) calculationKeyboardMode = CalculationKeyboardMode.DEEPCALC
+        activeEditor = target
+        focusedLine = index
+    }
 
     val currentLines = lineFields.map { it.text }
     val (results, variables) = remember(currentLines) { CalculatorEngine.evaluateSheet(currentLines) }
@@ -246,12 +267,11 @@ private fun DeepCalcApp() {
         val cursor = if (moveInsidePair) start + 1 else start + value.length
         lineFields = lineFields.toMutableList().also { it[safe] = TextFieldValue(nextText, androidx.compose.ui.text.TextRange(cursor)) }
         persist()
-        focusEpoch++
     }
     fun clearLine() {
         val safe = focusedLine.coerceIn(0, lineFields.lastIndex)
         lineFields = lineFields.toMutableList().also { it[safe] = TextFieldValue("") }
-        persist(); focusEpoch++
+        persist()
     }
     fun removeLine(index: Int) {
         if (lineFields.size <= 1) {
@@ -264,6 +284,7 @@ private fun DeepCalcApp() {
             expandedNotes = expandedNotes.filter { it != index }.map { if (it > index) it - 1 else it }.toSet()
             focusedLine = (index - 1).coerceAtLeast(0)
         }
+        activateCalculation(focusedLine)
         persist(); focusEpoch++
     }
     fun insertNewLine(index: Int) {
@@ -273,8 +294,8 @@ private fun DeepCalcApp() {
             .toMutableList().also { it.add(safe, TextFieldValue("")) }
         notes = notes.toMutableList().also { it.add(safe, "") }
         expandedNotes = expandedNotes.map { if (it >= safe) it + 1 else it }.toSet()
-        focusedLine = safe; customKeyboard = true; noteFocused = false
-        keyboard?.hide(); persist(); focusEpoch++
+        activateCalculation(safe)
+        persist(); focusEpoch++
     }
     fun deleteAtCursor() {
         val safe = focusedLine.coerceIn(0, lineFields.lastIndex)
@@ -293,7 +314,7 @@ private fun DeepCalcApp() {
             else -> return
         }
         lineFields = lineFields.toMutableList().also { it[safe] = TextFieldValue(next, androidx.compose.ui.text.TextRange(cursor)) }
-        persist(); focusEpoch++
+        persist()
     }
     fun sheetCopy(withNotes: Boolean): String {
         val out = mutableListOf<String>()
@@ -318,7 +339,9 @@ private fun DeepCalcApp() {
         lineFields = (item.lines.ifEmpty { listOf("") }).map { TextFieldValue(it) }
         notes = lineFields.indices.map { item.notes.getOrElse(it) { "" } }
         if (lineFields.last().text.trim().isNotEmpty()) { lineFields = lineFields + TextFieldValue(""); notes = notes + "" }
-        expandedNotes = emptySet(); focusedLine = lineFields.lastIndex; customKeyboard = true; noteFocused = false; focusedNoteIndex = null
+        expandedNotes = emptySet()
+        calculationKeyboardMode = CalculationKeyboardMode.DEEPCALC
+        activateCalculation(lineFields.lastIndex)
         persist(); closeDialog(); focusEpoch++; showToast("Opened “${item.title}”")
     }
     fun shareApp() {
@@ -333,13 +356,26 @@ private fun DeepCalcApp() {
     LaunchedEffect(toastVisible, toast) {
         if (toastVisible) { delay(1800); toastVisible = false }
     }
-    LaunchedEffect(customKeyboard, noteFocused, activeDialog) {
-        when {
-            activeDialog == "save" -> keyboard?.show()
-            activeDialog != null -> keyboard?.hide()
-            noteFocused -> keyboard?.show()
-            customKeyboard -> keyboard?.hide()
-            else -> keyboard?.show()
+    // A single routing decision owns both keyboard surfaces. The custom keypad
+    // is rendered only for a calculation target in DEEPCALC mode; the Android
+    // IME is requested for notes, Android-mode calculations and the save dialog.
+    LaunchedEffect(keyboardRoute) {
+        if (keyboardRoute.showCalculatorKeyboard) {
+            keyboard?.hide()
+            if (!calculatorKeyboardVisible) {
+                // Wait for the real IME inset to reach zero; a fixed delay can
+                // race slower keyboards and briefly show both keypads together.
+                snapshotFlow { WindowInsets.ime.getBottom(density) }.first { it == 0 }
+                calculatorKeyboardVisible = true
+            }
+        } else {
+            calculatorKeyboardVisible = false
+            if (keyboardRoute.showSystemKeyboard) {
+                delay(180)
+                keyboard?.show()
+            } else {
+                keyboard?.hide()
+            }
         }
     }
     LaunchedEffect(activeDialog) {
@@ -361,20 +397,18 @@ private fun DeepCalcApp() {
     CompositionLocalProvider(LocalViewConfiguration provides deepCalcViewConfiguration) {
       MaterialTheme(colorScheme = colorScheme) {
       Box(Modifier.fillMaxSize().background(colors.surface)) {
-        Column(Modifier.fillMaxSize().background(colors.surface).statusBarsPadding().navigationBarsPadding().imePadding()) {
+        Column(Modifier.fillMaxSize().background(colors.surface).safeDrawingPadding().imePadding()) {
             // Header mirrors the 58–62dp DeepCalc top bar.
             Row(Modifier.widthIn(max = 960.dp).fillMaxWidth().align(Alignment.CenterHorizontally).height(topBarHeight)
                 .padding(start = if (compactWidth) 15.dp else 20.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("DeepCalc", color = colors.primary, fontSize = if (compactWidth) 21.sp else 22.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.5).sp)
                 Spacer(Modifier.weight(1f))
                 IconButton(onClick = {
-                    // The header switch controls calculation fields only. Notes
-                    // always use the Android keyboard.
-                    customKeyboard = !customKeyboard
-                    persist()
-                }, enabled = !noteFocused) {
-                    Icon(if (customKeyboard) Icons.Filled.Keyboard else Icons.Filled.Smartphone,
-                        contentDescription = if (customKeyboard) "Switch to system keyboard" else "Switch to calculator keyboard",
+                    calculationKeyboardMode = if (calculationKeyboardMode == CalculationKeyboardMode.DEEPCALC)
+                        CalculationKeyboardMode.ANDROID else CalculationKeyboardMode.DEEPCALC
+                }, enabled = activeEditor is ActiveEditor.Calculation && activeDialog == null) {
+                    Icon(if (calculationKeyboardMode == CalculationKeyboardMode.DEEPCALC) Icons.Filled.Keyboard else Icons.Filled.Smartphone,
+                        contentDescription = if (calculationKeyboardMode == CalculationKeyboardMode.DEEPCALC) "Switch to Android keyboard" else "Switch to DeepCalc keypad",
                         tint = colors.muted)
                 }
                 Box {
@@ -384,7 +418,7 @@ private fun DeepCalcApp() {
                         DropdownMenuItem(text = { Text("Copy Sheet") }, onClick = { menuExpanded = false; copyText(sheetCopy(false), "Sheet copied") })
                         DropdownMenuItem(text = { Text("Copy Complete") }, onClick = { menuExpanded = false; copyText(sheetCopy(true), "Complete sheet copied") })
                         DropdownMenuItem(text = { Text("Save Sheet") }, onClick = { menuExpanded = false; sheetName = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date()); renameId = null; activeDialog = "save" })
-                        DropdownMenuItem(text = { Text("Clear Sheet") }, onClick = { menuExpanded = false; lineFields = listOf(TextFieldValue("")); notes = listOf(""); expandedNotes = emptySet(); focusedLine = 0; noteFocused = false; focusedNoteIndex = null; customKeyboard = true; persist(); focusEpoch++ })
+                        DropdownMenuItem(text = { Text("Clear Sheet") }, onClick = { menuExpanded = false; lineFields = listOf(TextFieldValue("")); notes = listOf(""); expandedNotes = emptySet(); calculationKeyboardMode = CalculationKeyboardMode.DEEPCALC; activateCalculation(0); persist(); focusEpoch++ })
                         HorizontalDivider(color = colors.variant)
                         MenuHeader("APP", colors)
                         DropdownMenuItem(text = { Text("History") }, onClick = { menuExpanded = false; activeDialog = "history" })
@@ -405,15 +439,20 @@ private fun DeepCalcApp() {
                         val noteBringIntoViewRequester = remember(index) { BringIntoViewRequester() }
                         Row(Modifier.widthIn(max = 960.dp).fillMaxWidth()
                             .bringIntoViewRequester(noteBringIntoViewRequester)
-                            .padding(start = if (compactWidth) 28.dp else 40.dp, end = if (compactWidth) 7.dp else 12.dp, bottom = 3.dp),
+                            .padding(start = if (compactWidth) 28.dp else 40.dp, end = if (compactWidth) 7.dp else 12.dp, bottom = 3.dp)
+                            .padding(bottom = if (activeEditor == ActiveEditor.Note(index)) 16.dp else 0.dp),
                             verticalAlignment = Alignment.Top) {
                             Text("⌃", modifier = Modifier.width(22.dp).padding(top = 1.dp), color = colors.primary, fontSize = 12.sp)
                             Column(Modifier.weight(1f).padding(start = 9.dp).borderStart(colors.noteAccent)) {
                                 val noteRequester = remember(index) { FocusRequester() }
-                                LaunchedEffect(focusedNoteIndex, expandedNotes) {
-                                    if (focusedNoteIndex == index && index in expandedNotes) {
+                                LaunchedEffect(activeEditor, expandedNotes, focusEpoch, activeDialog) {
+                                    if (activeEditor == ActiveEditor.Note(index) && index in expandedNotes && activeDialog == null) {
+                                        delay(80)
                                         runCatching { noteRequester.requestFocus() }
-                                        keyboard?.show()
+                                        delay(360)
+                                        noteBringIntoViewRequester.bringIntoView()
+                                        delay(100)
+                                        noteBringIntoViewRequester.bringIntoView()
                                     }
                                 }
                                 BasicTextField(value = notes.getOrElse(index) { "" }, onValueChange = { value ->
@@ -421,16 +460,7 @@ private fun DeepCalcApp() {
                                 }, modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 21.dp).heightIn(max = 100.dp).focusRequester(noteRequester)
                                     .onFocusChanged { focusState ->
                                         if (focusState.isFocused) {
-                                            noteFocused = true
-                                            focusedNoteIndex = index
-                                            keyboard?.show()
-                                            coroutineScope.launch {
-                                                delay(260)
-                                                noteBringIntoViewRequester.bringIntoView()
-                                            }
-                                        } else if (focusedNoteIndex == index) {
-                                            noteFocused = false
-                                            focusedNoteIndex = null
+                                            activeEditor = ActiveEditor.Note(index)
                                         }
                                     },
                                     textStyle = TextStyle(color = colors.text, fontSize = 12.sp, lineHeight = 19.sp),
@@ -441,10 +471,15 @@ private fun DeepCalcApp() {
                     }
                     val requester = remember(index) { FocusRequester() }
                     val lineBringIntoViewRequester = remember(index) { BringIntoViewRequester() }
-                    LaunchedEffect(focusEpoch, customKeyboard, noteFocused, focusedLine, activeDialog) {
-                        if (activeDialog == null && !noteFocused && focusedLine == index) {
-                            if (focusEpoch > 0) runCatching { requester.requestFocus() }
-                            delay(180)
+                    LaunchedEffect(focusEpoch, activeEditor, keyboardRoute, activeDialog) {
+                        if (activeDialog == null && activeEditor == ActiveEditor.Calculation(index)) {
+                            delay(70)
+                            runCatching { requester.requestFocus() }
+                            // Let IME/window resizing finish before asking the
+                            // scroll container to reveal the complete active row.
+                            delay(360)
+                            lineBringIntoViewRequester.bringIntoView()
+                            delay(100)
                             lineBringIntoViewRequester.bringIntoView()
                         }
                     }
@@ -452,7 +487,8 @@ private fun DeepCalcApp() {
                     val isComment = fieldValue.text.trimStart().startsWith("#")
                     Row(Modifier.widthIn(max = 960.dp).fillMaxWidth()
                         .bringIntoViewRequester(lineBringIntoViewRequester)
-                        .padding(horizontal = if (compactWidth) 6.dp else 12.dp, vertical = 4.dp),
+                        .padding(horizontal = if (compactWidth) 6.dp else 12.dp, vertical = 4.dp)
+                        .padding(bottom = if (activeEditor == ActiveEditor.Calculation(index)) 16.dp else 0.dp),
                         verticalAlignment = Alignment.CenterVertically) {
                         Box(
                             modifier = Modifier.width(if (compactWidth) 24.dp else 28.dp).height(36.dp)
@@ -473,11 +509,7 @@ private fun DeepCalcApp() {
                             }, modifier = Modifier.weight(1f).defaultMinSize(minHeight = 23.dp).focusRequester(requester)
                                 .onFocusChanged {
                                     if (it.isFocused) {
-                                        focusedLine = index
-                                        noteFocused = false
-                                        focusedNoteIndex = null
-                                        customKeyboard = true
-                                        keyboard?.hide()
+                                        activateCalculation(index)
                                     }
                                 },
                                 textStyle = TextStyle(color = if (isComment) colors.muted else colors.text, fontSize = if (compactWidth) 14.sp else 15.sp,
@@ -489,12 +521,11 @@ private fun DeepCalcApp() {
                             IconButton(onClick = {
                                 val closingNotes = index in expandedNotes
                                 expandedNotes = if (closingNotes) expandedNotes - index else expandedNotes + index
-                                noteFocused = !closingNotes
-                                focusedNoteIndex = if (noteFocused) index else null
                                 if (closingNotes) {
-                                    focusedLine = index
-                                    customKeyboard = true
+                                    activateCalculation(index)
                                     focusEpoch++
+                                } else {
+                                    activeEditor = ActiveEditor.Note(index)
                                 }
                                 persist()
                             }, modifier = Modifier.size(32.dp)) {
@@ -511,17 +542,30 @@ private fun DeepCalcApp() {
                         }
                     }
                 }
+                // Extra scroll range keeps the final calculation comfortably
+                // above the bottom edge when the keyboard resizes the window.
+                Spacer(Modifier.height(32.dp))
             }
 
-            if (customKeyboard && !noteFocused) {
+            if (toastVisible) {
+                Surface(
+                    modifier = Modifier.align(Alignment.CenterHorizontally).padding(horizontal = 24.dp, vertical = 6.dp),
+                    color = Color(0xFF292532), contentColor = Color.White,
+                    shape = RoundedCornerShape(12.dp), shadowElevation = 7.dp
+                ) {
+                    Text(toast, Modifier.padding(horizontal = 16.dp, vertical = 9.dp), fontSize = 12.sp, lineHeight = 16.sp)
+                }
+            }
+
+            if (showCalculatorKeyboard) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
                 CalculatorKeyboard(colors = colors, onTap = { key ->
                     when (key) {
                         "enter" -> insertNewLine(focusedLine + 1)
                         "backspace" -> deleteAtCursor()
                         "power" -> insertAtCursor("^")
-                        "hash" -> { insertAtCursor("#"); customKeyboard = false; keyboard?.show(); persist() }
-                        "dollar" -> { insertAtCursor("$"); customKeyboard = false; keyboard?.show(); persist() }
+                        "hash" -> { insertAtCursor("#"); calculationKeyboardMode = CalculationKeyboardMode.ANDROID; persist() }
+                        "dollar" -> { insertAtCursor("$"); calculationKeyboardMode = CalculationKeyboardMode.ANDROID; persist() }
                         "paste" -> {
                             val clip = clipboard.getText()?.text
                             if (!clip.isNullOrEmpty()) insertAtCursor(clip) else showToast("Clipboard is empty")
@@ -537,15 +581,6 @@ private fun DeepCalcApp() {
                     }
                 })
                 }
-            }
-        }
-
-        if (toastVisible) {
-            Surface(Modifier.align(Alignment.BottomCenter).padding(horizontal = 24.dp).padding(bottom = if (customKeyboard && !noteFocused) {
-                when { configuration.screenHeightDp <= 700 -> 265.dp; compactWidth -> 285.dp; else -> 300.dp }
-            } else 24.dp),
-                color = Color(0xFF292532), contentColor = Color.White, shape = RoundedCornerShape(12.dp), shadowElevation = 7.dp) {
-                Text(toast, Modifier.padding(horizontal = 16.dp, vertical = 11.dp), fontSize = 13.sp, lineHeight = 18.sp)
             }
         }
 

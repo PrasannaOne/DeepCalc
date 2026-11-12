@@ -1,0 +1,1 @@
+Final Android polish: exclusive calculator/Android keyboard switching, automatic focused-row scrolling above the active keyboard, compact Settings, improved About credits and native Share chooser.

@@ -1,28 +1,31 @@
-# DeepCalc Android final-release checklist
+# DeepCalc Android release checklist
 
-This checklist distinguishes source changes from checks that require a real Android device or CI run.
+This file separates source-level checks from checks that still require Android CI or a real device.
 
-| Area | Final source state | Verification status |
+| Area | Source state | Verification |
 |---|---|---|
-| Calculation engine | Preserved without changes in this release pass | Existing JUnit suite passed on the previous GitHub build; rerun against this release source |
-| Keyboard focus | Calculation fields default to the DeepCalc keypad; notes always use Android IME; header switch applies to calculation fields | Requires device verification |
-| Keyboard viewport | Focused calculation and note rows use bring-into-view requests; app layout applies IME insets | Requires device verification on short and tall screens |
-| Share | Native Android chooser shares the tagline and repository URL | Requires device verification |
-| About | Product description, Made by Prasanna, Kotlin/Compose/Material 3 stack and SoulCalc attribution | Source updated |
-| Settings | Theme and five palettes compacted into one non-scrollable page | Requires device verification on narrow/short screens |
-| Autosave and History | Existing local persistence and 100-sheet history retained | Regression test required |
-| Themes and palettes | System, Light, Dark, AMOLED; Purple, Sapphire, Jade, Ruby, Gold | Regression test required |
-| APK/AAB packaging | Existing GitHub Actions workflow builds all ABI APKs and a separate AAB | Previous source passed CI; final source must pass CI after upload |
-| F-Droid | MIT metadata draft and Fastlane listing assets included | Submission/tag/review still required |
+| Calculation engine | Preserved unchanged from the uploaded source | 17 JVM test methods passed in the local harness; rerun the Gradle test task in Android CI |
+| Keyboard ownership | One `ActiveEditor` plus one keyboard route; notes always route to Android IME | Routing smoke tests passed |
+| Keyboard hand-off | Custom keypad is removed before the Android IME is requested; keypad waits for IME hide before returning | Device animation check still required |
+| Focused-row visibility | Input and note rows request bring-into-view after window/IME resizing, with a second visibility pass and 32dp trailing scroll room | Device check still required |
+| Screen resizing | Edge-to-edge insets are handled by Compose; window uses `adjustResize` | Device check still required |
+| Share | Android `ACTION_SEND` chooser shares the tagline and repository URL | Device check still required |
+| About | Product description, Made by Prasanna, Kotlin/Compose/Material 3 stack and SoulCalc attribution | XML/source checks passed |
+| Settings | Theme and five palettes fit in one compact, non-scrollable page | Small-screen/device check still required |
+| Data | Active sheet autosave and local History (up to 100 sheets) retained | Regression test still required |
+| Themes | System, Light, Dark and AMOLED; Purple, Sapphire, Jade, Ruby and Gold | Device check still required |
+| Packaging | ABI APKs and separate AAB remain configured; version 2.1.1 / code 5 | Android CI build still required for this revision |
+| F-Droid | MIT metadata template and Fastlane listing assets included | Requires tagged source commit and F-Droid review |
 
-## Release verification still required
+## Release verification required
 
-- Upload the final source ZIP and wait for the repository's Android workflow to complete successfully.
-- Install the ARM64 APK and test calculation input, note input, keyboard switching, last-line visibility, rotation, split-screen and short-height layouts.
-- Test Share and confirm Android's native share chooser appears with the exact tagline and repository URL.
-- Confirm About credits and Settings fit on a single page at phone width and with larger font settings.
-- Save, reopen, rename and delete sheets; verify notes and active-sheet autosave survive app restart.
-- Verify the release APK's package ID, version name/code and signature before publishing.
-- Create the `v2.1.0` tag on the exact final source commit before preparing the F-Droid submission.
+1. Run `:app:testDebugUnitTest`, `:app:assembleDebug`, `:app:assembleRelease` and `:app:bundleRelease` on Android CI.
+2. Install the ARM64 release APK on a physical phone. Test input-to-input, input-to-note, note-to-input, manual keyboard switching and rapid repeated tapping.
+3. Test the last calculation and last note on short and tall screens, with gesture and three-button navigation, display-size changes, portrait/landscape and split-screen.
+4. Confirm the two keyboard surfaces never appear together, and that the focused editor remains visibly above the active keyboard with a small gap.
+5. Test Android's native Share chooser and verify the exact tagline and repository URL.
+6. Confirm About credits and Settings fit at narrow phone width and larger display/font settings.
+7. Save, reopen, rename and delete sheets; confirm notes and active-sheet autosave survive app restart.
+8. Verify APK package ID, version name/code and signing certificate. Create the `v2.1.1` tag only on the exact final source commit.
 
-Do not describe the final source as device-verified or F-Droid-approved until those checks have actually passed.
+Do not describe the source as device-verified or F-Droid-approved until those checks pass.
