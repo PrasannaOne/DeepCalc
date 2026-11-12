@@ -24,3 +24,9 @@
 A full Android Gradle build was not run here: this environment has no Gradle installation or Android SDK, and external dependency downloads are unavailable. The local JVM harness is not a substitute for `:app:testDebugUnitTest`, `assembleDebug`, `assembleRelease` or `bundleRelease`.
 
 The IME, animation, viewport and device-specific keyboard behaviour also cannot be certified without installing this build on the target Android phone. Use `INTERACTION-REGRESSION-CHECKLIST.md` before publishing. Do not label the release build as device-verified until those checks pass.
+
+
+## CI compiler correction (2026-11-12)
+
+- Added the missing `androidx.compose.ui.platform.ViewConfiguration` import used by the long-press configuration wrapper in `MainActivity.kt`.
+- This addresses the exact unresolved-reference compiler error reported by the Android workflow. It does not establish that the full Android project compiles; rerun the Android Gradle workflow to verify all source and dependency compatibility.
