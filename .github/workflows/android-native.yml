@@ -185,30 +185,22 @@ jobs:
       - name: Check out source for version metadata
         uses: actions/checkout@v7
 
-      - name: Determine release version and skip existing releases
+      - name: Determine release version
         id: version
-        env:
-          GH_TOKEN: ${{ github.token }}
+        shell: bash
         run: |
+          set -euo pipefail
           VERSION="$(sed -n 's/^[[:space:]]*versionName = \"\([^\"]*\)\".*/\1/p' DeepCalc-Android/app/build.gradle.kts | head -n1)"
           test -n "$VERSION"
-          TAG="v$VERSION"
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            echo "Release $TAG already exists. Bump versionName to publish a new release."
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-            echo "skip=false" >> "$GITHUB_OUTPUT"
-          fi
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/download-artifact@v7
-        if: steps.version.outputs.skip != 'true'
+      - name: Download release assets
+        uses: actions/download-artifact@v7
         with:
           name: DeepCalc-Release-Assets
           path: release-assets
 
-      - name: Publish GitHub Release
-        if: steps.version.outputs.skip != 'true'
+      - name: Create or repair GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           name: DeepCalc ${{ steps.version.outputs.tag }}
@@ -216,6 +208,7 @@ jobs:
           target_commitish: main
           generate_release_notes: true
           fail_on_unmatched_files: true
+          overwrite_files: true
           files: |
             release-assets/DeepCalc-Universal.apk
             release-assets/DeepCalc-arm64-v8a.apk
@@ -224,4 +217,3 @@ jobs:
             release-assets/DeepCalc-x86_64.apk
             release-assets/DeepCalc-release.aab
             release-assets/SHA256SUMS.txt
-            
